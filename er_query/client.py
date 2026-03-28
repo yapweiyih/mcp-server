@@ -150,9 +150,9 @@ def query_er_by_date(
     Queries the Firestore collection for documents created within the
     specified year or year+month range, based on the 'created_at' field.
 
-    The created_at field is stored as an ISO 8601 string in Firestore
-    (e.g., '2025-10-30T03:08:56+00:00'). We construct datetime range
-    boundaries and use Firestore's range query operators.
+    The created_at field is stored as a native Firestore Timestamp
+    (DatetimeWithNanoseconds). We construct datetime range boundaries
+    and compare directly with datetime objects.
 
     Args:
         year: The year to filter by (e.g., 2025).
@@ -199,17 +199,13 @@ def query_er_by_date(
         start_dt = datetime(year, 1, 1, tzinfo=timezone.utc)
         end_dt = datetime(year + 1, 1, 1, tzinfo=timezone.utc)
 
-    # Convert to ISO format strings to match Firestore storage format
-    start_str = start_dt.isoformat()
-    end_str = end_dt.isoformat()
-
     collection_ref = _get_collection_ref(client)
 
-    # Firestore range query on created_at string field
-    # ISO 8601 strings sort lexicographically in date order
+    # Firestore stores created_at as a native Timestamp type
+    # (DatetimeWithNanoseconds), so we compare with datetime objects directly
     query = collection_ref.where(
-        filter=firestore.FieldFilter("created_at", ">=", start_str)
-    ).where(filter=firestore.FieldFilter("created_at", "<", end_str))
+        filter=firestore.FieldFilter("created_at", ">=", start_dt)
+    ).where(filter=firestore.FieldFilter("created_at", "<", end_dt))
 
     results = []
     for doc in query.stream():
