@@ -124,6 +124,100 @@ async def test_search_by_email_no_results():
             print("   ✅ Returns empty list correctly")
 
 
+async def test_adk_agent_with_cloud_mcp():
+    """Test ADK agent using the Cloud Run MCP server via SSE.
+
+    Creates an agent that connects to the deployed MCP server and
+    verifies it can answer natural language queries using the remote tools.
+    """
+    import os
+
+    from dotenv import load_dotenv
+    from google.adk.agents import Agent
+    from google.adk.runners import Runner
+    from google.adk.sessions import InMemorySessionService
+    from google.adk.tools.mcp_tool import McpToolset
+    from google.adk.tools.mcp_tool.mcp_session_manager import SseConnectionParams
+    from google.genai import types
+
+    # Load Vertex AI config
+    load_dotenv("adk_agent/.env")
+
+    CLOUD_MCP_URL = MCP_SERVER_URL.replace("/sse", "")
+
+    print("\n🤖 Test: ADK Agent with Cloud Run MCP Server")
+    print(f"   MCP URL: {CLOUD_MCP_URL}/sse")
+
+    # Create agent pointing to Cloud Run MCP server
+    cloud_agent = Agent(
+        name="cloud_er_agent",
+        model="gemini-2.0-flash",
+        instruction=(
+            "You are an ER query assistant. Use search_er_by_email to find "
+            "ERs by email and search_er_by_date to find ERs by date."
+        ),
+        tools=[
+            McpToolset(
+                connection_params=SseConnectionParams(
+                    url=f"{CLOUD_MCP_URL}/sse",
+                    headers=_get_auth_headers(),
+                ),
+            )
+        ],
+    )
+
+    session_service = InMemorySessionService()
+    runner = Runner(
+        agent=cloud_agent,
+        app_name="cloud_test",
+        session_service=session_service,
+    )
+
+    # --- Test 1: Email query ---
+    print("\n   📧 Agent query: 'Find ERs assigned to issein@google.com'")
+    session = await session_service.create_session(
+        app_name="cloud_test", user_id="test"
+    )
+    final_text = ""
+    async for event in runner.run_async(
+        user_id="test",
+        session_id=session.id,
+        new_message=types.Content(
+            role="user",
+            parts=[types.Part.from_text(text="Find ERs assigned to issein@google.com")],
+        ),
+    ):
+        if event.is_final_response() and event.content and event.content.parts:
+            final_text = event.content.parts[0].text
+
+    print(f"   Response: {final_text[:300]}...")
+    assert "ER-431059" in final_text or "Australian Postal" in final_text, (
+        f"Expected ER-431059 or Australian Postal in response, got: {final_text[:200]}"
+    )
+    print("   ✅ Agent correctly used Cloud Run MCP tool for email query")
+
+    # --- Test 2: Date query ---
+    print("\n   📅 Agent query: 'Show ERs from April 2024'")
+    session2 = await session_service.create_session(
+        app_name="cloud_test", user_id="test"
+    )
+    final_text2 = ""
+    async for event in runner.run_async(
+        user_id="test",
+        session_id=session2.id,
+        new_message=types.Content(
+            role="user",
+            parts=[types.Part.from_text(text="Show ERs from April 2024")],
+        ),
+    ):
+        if event.is_final_response() and event.content and event.content.parts:
+            final_text2 = event.content.parts[0].text
+
+    print(f"   Response: {final_text2[:300]}...")
+    assert "ER" in final_text2, f"Expected ER references in response, got: {final_text2[:200]}"
+    print("   ✅ Agent correctly used Cloud Run MCP tool for date query")
+
+
 async def main():
     """Run all cloud MCP server tests."""
     print("=" * 60)
@@ -135,6 +229,7 @@ async def main():
     await test_search_by_email()
     await test_search_by_date()
     await test_search_by_email_no_results()
+    await test_adk_agent_with_cloud_mcp()
 
     print("\n" + "=" * 60)
     print("✅ All cloud MCP server tests passed!")
