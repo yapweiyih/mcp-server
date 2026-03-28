@@ -31,6 +31,8 @@ mcp = FastMCP(
         "specific Customer Engineer, or query_er_by_date to find ERs "
         "created in a specific year or month."
     ),
+    host="0.0.0.0",
+    port=int(os.getenv("PORT", "8080")),
 )
 
 
@@ -99,8 +101,7 @@ def main():
     transport = os.getenv("MCP_TRANSPORT", "stdio")
 
     if transport == "sse":
-        port = int(os.getenv("PORT", "8080"))
-        mcp.run(transport="sse", port=port)
+        mcp.run(transport="sse")
     else:
         mcp.run(transport="stdio")
 
