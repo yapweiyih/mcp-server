@@ -111,6 +111,11 @@ deploy-run:
 		--memory 512Mi \
 		--timeout 300
 
+test-cloud:
+	@echo "☁️  Testing Cloud Run MCP server..."
+	@echo "  URL: https://er-mcp-server-462396196470.$(REGION).run.app"
+	uv run python tests/test_cloud_mcp.py
+
 # ============================================================
 # Utilities
 # ============================================================
