@@ -87,15 +87,13 @@ agent-run:
 # Deployment
 # ============================================================
 
-deploy: docker-build docker-push deploy-run
+deploy: docker-build deploy-run
 
 docker-build:
-	@echo "🐳 Building Docker image..."
-	docker build -t $(IMAGE_NAME) .
-
-docker-push:
-	@echo "📤 Pushing image to GCR..."
-	docker push $(IMAGE_NAME)
+	@echo "🐳 Building Docker image via Cloud Build..."
+	gcloud builds submit --tag $(IMAGE_NAME) \
+		--project $(PROJECT_ID) \
+		--region $(REGION)
 
 deploy-run:
 	@echo "🚀 Deploying to Cloud Run..."
