@@ -15,12 +15,14 @@
 #   make clean         - Clean build artifacts
 
 .PHONY: install test test-integration test-agent test-all \
-        mcp-local mcp-sse agent-web agent-run deploy lint clean
+        mcp-local mcp-sse agent-web agent-run \
+        deploy docker-build docker-push deploy-run lint clean
 
 # Configuration
 PROJECT_ID ?= ikigai-dev-376122
 REGION ?= us-central1
 SERVICE_NAME ?= er-mcp-server
+IMAGE_NAME ?= gcr.io/$(PROJECT_ID)/$(SERVICE_NAME)
 
 # ============================================================
 # Setup
@@ -85,15 +87,26 @@ agent-run:
 # Deployment
 # ============================================================
 
-deploy:
-	@echo "🚀 Deploying MCP server to Cloud Run..."
+deploy: docker-build docker-push deploy-run
+
+docker-build:
+	@echo "🐳 Building Docker image..."
+	docker build -t $(IMAGE_NAME) .
+
+docker-push:
+	@echo "📤 Pushing image to GCR..."
+	docker push $(IMAGE_NAME)
+
+deploy-run:
+	@echo "🚀 Deploying to Cloud Run..."
 	@echo "  Project: $(PROJECT_ID)"
 	@echo "  Region:  $(REGION)"
 	@echo "  Service: $(SERVICE_NAME)"
+	@echo "  Image:   $(IMAGE_NAME)"
 	gcloud run deploy $(SERVICE_NAME) \
 		--project $(PROJECT_ID) \
 		--region $(REGION) \
-		--source . \
+		--image $(IMAGE_NAME) \
 		--allow-unauthenticated \
 		--set-env-vars="MCP_TRANSPORT=sse" \
 		--port 8080 \
