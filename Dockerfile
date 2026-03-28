@@ -10,26 +10,22 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# Install uv for fast dependency management
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
-
-# Copy dependency files first for layer caching
-COPY pyproject.toml uv.lock ./
-
-# Install dependencies (without dev extras)
-RUN uv sync --no-dev --no-install-project
+# Install only the MCP server dependencies (no google-adk needed)
+RUN pip install --no-cache-dir \
+    google-cloud-firestore>=2.19.0 \
+    python-dotenv>=1.0.0 \
+    pydantic>=2.0.0 \
+    "mcp[cli]>=1.0.0"
 
 # Copy application code
 COPY er_query/ er_query/
 COPY mcp_server/ mcp_server/
 COPY .env_dev .env_dev
 
-# Install the project itself
-RUN uv sync --no-dev
-
 # Cloud Run sets PORT env var (default 8080)
 ENV PORT=8080
 ENV MCP_TRANSPORT=sse
+ENV PYTHONPATH=/app
 
 # Run the MCP server
-CMD ["uv", "run", "python", "-m", "mcp_server"]
+CMD ["python", "-m", "mcp_server"]
