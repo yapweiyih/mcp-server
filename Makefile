@@ -21,7 +21,6 @@
 PROJECT_ID ?= ikigai-dev-376122
 REGION ?= us-central1
 SERVICE_NAME ?= er-mcp-server
-IMAGE_NAME ?= gcr.io/$(PROJECT_ID)/$(SERVICE_NAME)
 
 # ============================================================
 # Setup
@@ -100,18 +99,6 @@ deploy:
 		--port 8080 \
 		--memory 512Mi \
 		--timeout 300
-
-deploy-docker:
-	@echo "🐳 Building and pushing Docker image..."
-	docker build -t $(IMAGE_NAME) .
-	docker push $(IMAGE_NAME)
-	gcloud run deploy $(SERVICE_NAME) \
-		--project $(PROJECT_ID) \
-		--region $(REGION) \
-		--image $(IMAGE_NAME) \
-		--allow-unauthenticated \
-		--set-env-vars="MCP_TRANSPORT=sse" \
-		--port 8080
 
 # ============================================================
 # Utilities
