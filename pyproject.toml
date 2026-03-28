@@ -1,0 +1,31 @@
+[project]
+name = "er-mcp-review"
+version = "0.1.0"
+description = "MCP server and ADK agent for querying Expert Request data from Firestore"
+requires-python = ">=3.11"
+dependencies = [
+    "google-cloud-firestore>=2.19.0",
+    "python-dotenv>=1.0.0",
+    "pydantic>=2.0.0",
+    "click>=8.1.0",
+    "mcp[cli]>=1.0.0",
+    "google-adk>=0.5.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
+    "pytest-mock>=3.14.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.hatch.build.targets.wheel]
+packages = ["er_query", "mcp_server", "adk_agent"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
