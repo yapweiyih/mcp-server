@@ -1,25 +1,139 @@
-# Tasks
+# ER MCP Review
 
-- (1) create python function using bq client to retrieve data based on query, you should design function input param in a way that can be easily extend to MCP server tool later
-- sample data in er_*.json
-- database config is in .env_dev
-- Support the following type of query efficiently
-  - retrieve ER based on input email, assigned_ce_email=weiyih@google.com
-  - retrieve ER based on input year, year/month, based on created_at date
-  - return result only need to include the following fields:
-    - er_name
-    - account_name
-    - account_sub_region
-    - assigned_ce_email
-    - details
+Expert Request (ER) query system built with Firestore, MCP (Model Context Protocol), and ADK (Agent Development Kit).
 
-- Test every function locally with different input param to ensure it is working
-- (2) Once local test pass, deploy the function as MCP server tools onto cloud run
-  - First run a local mcp server tool to ensure it is working
-  - Once pass all local test, deploy to cloudrun
-- Next build an adk agent (use adk_python) that use this mcp tools, to answer user query
-  - Create different prompt to ensure agent return the correct answer.
-- You should complete this task autonomously, ensure all valid use cases and test cases are covered
-- Commit your code for every logical point that has been tested working with clear message, and move on to next features.
-- create a Makefile to easily run the above test
-- Before you complete the task, do a final validation to see if you can improve or if there is any bug.
+## Architecture
+
+```
+User Query → ADK Agent (Gemini 2.0) → MCP Server (SSE) → Firestore
+                                         ↑
+                                    Cloud Run
+```
+
+## Project Structure
+
+```
+├── er_query/              # Firestore query functions
+│   ├── client.py          # query_er_by_email, query_er_by_date
+│   └── models.py          # ERRecord Pydantic model
+├── mcp_server/            # MCP server (FastMCP)
+│   ├── server.py          # MCP tool definitions (search_er_by_email, search_er_by_date)
+│   └── __main__.py        # Entry point: python -m mcp_server
+├── adk_agent/             # ADK agent (Gemini 2.0 Flash)
+│   ├── agent.py           # root_agent with MCP toolset (stdio/SSE)
+│   └── .env               # Vertex AI config
+├── tests/
+│   ├── test_er_query.py   # 16 unit tests (mocked Firestore)
+│   ├── test_mcp_server.py # 9 unit tests (mocked queries)
+│   ├── test_integration.py# 6 integration tests (real Firestore)
+│   ├── test_adk_agent.py  # 6 agent tests (local MCP + Vertex AI)
+│   └── test_cloud_mcp.py  # 6 cloud tests (Cloud Run MCP + ADK agent)
+├── wy-tutorial/
+│   └── approach.md        # Architecture & design decisions
+├── Dockerfile             # Cloud Run container
+├── Makefile               # All commands
+├── .env_dev               # Firestore config
+└── pyproject.toml         # Dependencies
+```
+
+## Quick Start
+
+```bash
+# Install dependencies
+make install
+
+# Run unit tests (no GCP needed)
+make test
+
+# Run integration tests (requires GCP credentials)
+make test-integration
+
+# Run ADK agent tests (requires GCP + Vertex AI)
+make test-agent
+
+# Test deployed Cloud Run MCP server + ADK agent via SSE
+make test-cloud
+
+# Run all tests
+make test-all
+```
+
+## MCP Server
+
+```bash
+# Run MCP server locally (stdio mode)
+make mcp-local
+
+# Run MCP server in SSE mode (port 8080)
+make mcp-sse
+
+# Test MCP tools listing
+make mcp-test-tools
+```
+
+## ADK Agent
+
+```bash
+# Launch ADK web UI
+make agent-web
+
+# Launch ADK CLI chat
+make agent-run
+```
+
+## Deployment
+
+```bash
+# Build Docker image via Cloud Build + deploy to Cloud Run
+make deploy
+
+# Or run each step separately:
+make docker-build   # Build and push image to GCR
+make deploy-run     # Deploy GCR image to Cloud Run
+
+# Test the deployed server
+make test-cloud
+```
+
+**Deployed URL**: `https://er-mcp-server-462396196470.us-central1.run.app`
+
+## Tasks
+
+### (1) Firestore Query Functions ✅
+- Created `er_query/client.py` with Firestore client functions
+- Sample data in `er_431059.json`, database config in `.env_dev`
+- Function params designed for easy MCP tool extension (flat types, dependency injection)
+- Supported queries:
+  - `query_er_by_email(assigned_ce_email)` — retrieve ERs by assigned CE email
+  - `query_er_by_date(year, month=None)` — retrieve ERs by created_at date (year or year/month)
+- Returns only required fields: `er_name`, `account_name`, `account_sub_region`, `assigned_ce_email`, `details`
+- 16 unit tests + 6 integration tests passing
+
+### (2) MCP Server + Cloud Run Deployment ✅
+- `mcp_server/server.py` using FastMCP with `search_er_by_email` and `search_er_by_date` tools
+- Local testing via stdio mode (`make mcp-local`)
+- SSE mode for Cloud Run (`make mcp-sse`)
+- Deployed to Cloud Run via container build (`make deploy`)
+- 9 unit tests + 6 cloud end-to-end tests passing
+
+### (3) ADK Agent ✅
+- `adk_agent/agent.py` with Gemini 2.0 Flash model
+- Connects to MCP server via stdio (local) or SSE (Cloud Run)
+- Tested with multiple prompts:
+  - Email queries (known/unknown emails)
+  - Date queries (year only, year+month)
+  - Edge cases (ambiguous queries, greetings)
+  - ADK agent via Cloud Run MCP server (SSE)
+- 6 local agent tests + 2 cloud agent tests passing
+
+### (4) Makefile ✅
+- `make test` — unit tests
+- `make test-integration` — Firestore integration tests
+- `make test-agent` — ADK agent tests (local MCP)
+- `make test-cloud` — Cloud Run MCP server + ADK agent via SSE
+- `make deploy` — build + deploy to Cloud Run
+- `make agent-web` / `make agent-run` — launch agent UI/CLI
+
+### (5) Git Commits ✅
+- Code committed at every logical point with clear messages
+- 10 commits tracking development progression
