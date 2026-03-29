@@ -140,6 +140,81 @@ def query_er_by_email(
     return results
 
 
+def query_er_by_name(
+    er_name: str,
+    fields: str | None = None,
+    client: firestore.Client | None = None,
+) -> list[dict]:
+    """Retrieve a specific Expert Request by its ER name, optionally returning only selected fields.
+
+    Queries the Firestore collection for the document whose er_name matches
+    the provided identifier. If `fields` is specified, only those fields are
+    returned; otherwise all non-embedding fields are returned.
+
+    This is useful for inspecting specific attributes of an ER, such as
+    fsa_assets, fsa_status, workload_gross_revenue, etc.
+
+    Args:
+        er_name: The ER identifier (e.g., 'ER-431059'). Case-sensitive.
+        fields: Optional comma-separated list of field names to return
+            (e.g., 'fsa_status,product,details'). If None or empty,
+            returns all fields except 'embedding' and 'content_hash'.
+        client: Optional Firestore client for dependency injection
+            during testing. If None, creates a new client.
+
+    Returns:
+        A list of dictionaries containing the requested fields.
+        Typically returns 0 or 1 results since er_name should be unique.
+        Each dict has an 'er_name' key plus the requested fields.
+
+        Returns an empty list if no matching ER is found.
+
+    Example return value:
+        [
+            {
+                'er_name': 'ER-431059',
+                'fsa_status': 'Completed',
+                'product': 'Gemini Enterprise'
+            }
+        ]
+    """
+    # Fields to always exclude from full document returns (large/internal)
+    _EXCLUDE_FIELDS = {"embedding", "content_hash", "account_vector_id",
+                       "opportunity_vector_id", "vector_id", "last_embedded_at",
+                       "needs_embedding"}
+
+    collection_ref = _get_collection_ref(client)
+
+    query = collection_ref.where(
+        filter=firestore.FieldFilter("er_name", "==", er_name)
+    )
+
+    results = []
+    for doc in query.stream():
+        doc_dict = doc.to_dict()
+
+        if fields and fields.strip():
+            # Parse comma-separated field names, strip whitespace
+            requested_fields = [f.strip() for f in fields.split(",") if f.strip()]
+            # Always include er_name for context
+            record = {"er_name": doc_dict.get("er_name", "")}
+            for field_name in requested_fields:
+                if field_name != "er_name" and field_name in doc_dict:
+                    record[field_name] = doc_dict[field_name]
+                elif field_name != "er_name":
+                    record[field_name] = None  # Field not found in document
+        else:
+            # Return all fields except excluded ones
+            record = {
+                k: v for k, v in doc_dict.items()
+                if k not in _EXCLUDE_FIELDS
+            }
+
+        results.append(record)
+
+    return results
+
+
 def query_er_by_date(
     year: int,
     month: int | None = None,

@@ -39,6 +39,16 @@
     - Ambiguous query, general greeting
   - Test agent connecting to both local and remote (Cloud Run) MCP server
 
+- (4) update MCP tool to be able to support the following types of query:
+  - for ER-431059, show me the fsa_asset fsa_tatus fields
+  - for ER-431059, show me the details, product fields
+  - for ER-431059, show me the workload_name, workload_gross_revenue, workload_gross_revenue_tracking
+
+- (5) show me how to build a new agent skill that can be installed using "npx skills my-er-skill"
+  - Show me how to do this by creating SKILL.md that guide agent to leverage on this ER MCP server.
+  - how to publish to https://skills.sh/
+  - do not publish until i tell you to so
+
 - You should complete this task autonomously, ensure all valid use cases and test cases are covered
 - Commit your code for every logical point that has been tested working with clear message, and move on to next features
 - Create a Makefile to easily run all the above tests (unit, integration, agent, cloud, deploy, lint, clean, etc.)

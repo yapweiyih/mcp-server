@@ -20,16 +20,17 @@ import os
 
 from mcp.server.fastmcp import FastMCP
 
-from er_query.client import query_er_by_date, query_er_by_email
+from er_query.client import query_er_by_date, query_er_by_email, query_er_by_name
 
 # Create the MCP server instance
 mcp = FastMCP(
     "ER Query Server",
     instructions=(
         "This server provides tools for querying Expert Request (ER) data "
-        "from Firestore. Use query_er_by_email to find ERs assigned to a "
-        "specific Customer Engineer, or query_er_by_date to find ERs "
-        "created in a specific year or month."
+        "from Firestore. Use search_er_by_email to find ERs assigned to a "
+        "specific Customer Engineer, search_er_by_date to find ERs "
+        "created in a specific year or month, or get_er_fields to retrieve "
+        "specific fields from an ER by its name (e.g., ER-431059)."
     ),
     host="0.0.0.0",
     port=int(os.getenv("PORT", "8080")),
@@ -89,6 +90,51 @@ def search_er_by_date(year: int, month: int | None = None) -> str:
     """
     results = query_er_by_date(year=year, month=month)
     return json.dumps(results, indent=2, ensure_ascii=False)
+
+
+@mcp.tool()
+def get_er_fields(er_name: str, fields: str | None = None) -> str:
+    """Get specific fields from an Expert Request by its ER name.
+
+    Use this tool when the user asks about a specific ER and wants to see
+    particular fields. For example:
+    - "for ER-431059, show me the fsa_assets, fsa_status fields"
+    - "for ER-431059, show me the details, product fields"
+    - "for ER-431059, show me the workload_name, workload_gross_revenue"
+
+    Common field names include:
+    - Basic: er_name, account_name, status, product, details, priority
+    - FSA: fsa_status, fsa_assets, fsa_flight_status, fsa_start_date,
+      fsa_end_date, fsa_status_tracking, fsa_weekly_update,
+      fsa_workload_gross_revenue_tracking, fsa_workload_progress_tracking
+    - Workload: workload_name, workload_gross_revenue, workload_pillar,
+      workload_progress, workload_solution,
+      workload_gross_revenue_tracking, workload_progress_tracking
+    - People: assigned_ce_email, assigned_ce_name, requestor_name,
+      requestor_email
+    - Opportunity: opportunity_name, opportunity_amount,
+      opportunity_stage_name
+    - Engagement: engagement_type, engagement_tier, engagement_priority
+
+    Args:
+        er_name: The ER identifier (e.g., 'ER-431059'). Must include the
+            'ER-' prefix.
+        fields: Optional comma-separated list of field names to return
+            (e.g., 'fsa_status,product,details'). If not provided,
+            returns all fields (except internal/embedding fields).
+
+    Returns:
+        A JSON string containing a list of matching ER records with only
+        the requested fields. Always includes er_name for context.
+
+        Returns '[]' if the ER is not found.
+
+    Example:
+        get_er_fields("ER-431059", "fsa_status,product")
+        -> '[{"er_name": "ER-431059", "fsa_status": "Completed", "product": "Gemini Enterprise"}]'
+    """
+    results = query_er_by_name(er_name=er_name, fields=fields)
+    return json.dumps(results, indent=2, ensure_ascii=False, default=str)
 
 
 def main():

@@ -10,7 +10,12 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from er_query.client import _doc_to_er_record, query_er_by_date, query_er_by_email
+from er_query.client import (
+    _doc_to_er_record,
+    query_er_by_date,
+    query_er_by_email,
+    query_er_by_name,
+)
 
 # ---------------------------------------------------------------------------
 # Sample data fixtures
@@ -26,6 +31,14 @@ SAMPLE_DOC_FULL = {
     "status": "Completed",
     "product": "Gemini Enterprise",
     "embedding": "some_vector_data",
+    "fsa_status": "Completed",
+    "fsa_assets": [{"type": "Scope Document", "url": ""}],
+    "workload_name": "AusPost - Agentspace",
+    "workload_gross_revenue": 1920000.0,
+    "workload_gross_revenue_tracking": [{"amount": 1920000.0, "date": "2026-03-19"}],
+    "content_hash": "abc123",
+    "needs_embedding": False,
+    "vector_id": "xyz",
 }
 
 SAMPLE_DOC_2 = {
@@ -190,6 +203,143 @@ class TestQueryErByEmail:
             "assigned_ce_email",
             "details",
         }
+
+
+# ---------------------------------------------------------------------------
+# Tests for query_er_by_name
+# ---------------------------------------------------------------------------
+
+
+class TestQueryErByName:
+    """Tests for the query_er_by_name function."""
+
+    @patch("er_query.client._get_collection_ref")
+    def test_returns_specific_fields(self, mock_get_coll):
+        """Should return only the requested fields plus er_name."""
+        mock_get_coll.return_value = _make_mock_collection([SAMPLE_DOC_FULL])
+
+        results = query_er_by_name("ER-431059", fields="fsa_status,product")
+
+        assert len(results) == 1
+        assert results[0]["er_name"] == "ER-431059"
+        assert results[0]["fsa_status"] == "Completed"
+        assert results[0]["product"] == "Gemini Enterprise"
+        assert "embedding" not in results[0]
+        assert "account_name" not in results[0]
+
+    @patch("er_query.client._get_collection_ref")
+    def test_returns_fsa_assets_and_status(self, mock_get_coll):
+        """Should return fsa_assets and fsa_status when requested."""
+        mock_get_coll.return_value = _make_mock_collection([SAMPLE_DOC_FULL])
+
+        results = query_er_by_name("ER-431059", fields="fsa_assets,fsa_status")
+
+        assert len(results) == 1
+        assert results[0]["er_name"] == "ER-431059"
+        assert results[0]["fsa_assets"] == [{"type": "Scope Document", "url": ""}]
+        assert results[0]["fsa_status"] == "Completed"
+
+    @patch("er_query.client._get_collection_ref")
+    def test_returns_workload_fields(self, mock_get_coll):
+        """Should return workload-related fields when requested."""
+        mock_get_coll.return_value = _make_mock_collection([SAMPLE_DOC_FULL])
+
+        results = query_er_by_name(
+            "ER-431059",
+            fields="workload_name,workload_gross_revenue,workload_gross_revenue_tracking",
+        )
+
+        assert len(results) == 1
+        assert results[0]["er_name"] == "ER-431059"
+        assert results[0]["workload_name"] == "AusPost - Agentspace"
+        assert results[0]["workload_gross_revenue"] == 1920000.0
+        assert results[0]["workload_gross_revenue_tracking"] == [
+            {"amount": 1920000.0, "date": "2026-03-19"}
+        ]
+
+    @patch("er_query.client._get_collection_ref")
+    def test_returns_details_and_product(self, mock_get_coll):
+        """Should return details and product when requested."""
+        mock_get_coll.return_value = _make_mock_collection([SAMPLE_DOC_FULL])
+
+        results = query_er_by_name("ER-431059", fields="details,product")
+
+        assert len(results) == 1
+        assert results[0]["er_name"] == "ER-431059"
+        assert "Gemini Enterprise" in results[0]["product"]
+        assert "[WHY]" in results[0]["details"]
+
+    @patch("er_query.client._get_collection_ref")
+    def test_returns_all_fields_when_no_fields_specified(self, mock_get_coll):
+        """Should return all fields (except excluded) when fields is None."""
+        mock_get_coll.return_value = _make_mock_collection([SAMPLE_DOC_FULL])
+
+        results = query_er_by_name("ER-431059")
+
+        assert len(results) == 1
+        # Should include non-excluded fields
+        assert results[0]["er_name"] == "ER-431059"
+        assert results[0]["fsa_status"] == "Completed"
+        assert results[0]["product"] == "Gemini Enterprise"
+        # Should exclude internal fields
+        assert "embedding" not in results[0]
+        assert "content_hash" not in results[0]
+        assert "vector_id" not in results[0]
+        assert "needs_embedding" not in results[0]
+
+    @patch("er_query.client._get_collection_ref")
+    def test_returns_empty_for_nonexistent_er(self, mock_get_coll):
+        """Should return empty list when ER doesn't exist."""
+        mock_get_coll.return_value = _make_mock_collection([])
+
+        results = query_er_by_name("ER-999999", fields="fsa_status")
+
+        assert results == []
+
+    @patch("er_query.client._get_collection_ref")
+    def test_nonexistent_field_returns_none(self, mock_get_coll):
+        """Should return None for requested fields that don't exist in the doc."""
+        mock_get_coll.return_value = _make_mock_collection([SAMPLE_DOC_FULL])
+
+        results = query_er_by_name("ER-431059", fields="nonexistent_field")
+
+        assert len(results) == 1
+        assert results[0]["er_name"] == "ER-431059"
+        assert results[0]["nonexistent_field"] is None
+
+    @patch("er_query.client._get_collection_ref")
+    def test_handles_whitespace_in_fields(self, mock_get_coll):
+        """Should handle whitespace around field names in comma-separated list."""
+        mock_get_coll.return_value = _make_mock_collection([SAMPLE_DOC_FULL])
+
+        results = query_er_by_name("ER-431059", fields=" fsa_status , product ")
+
+        assert len(results) == 1
+        assert results[0]["fsa_status"] == "Completed"
+        assert results[0]["product"] == "Gemini Enterprise"
+
+    @patch("er_query.client._get_collection_ref")
+    def test_empty_fields_string_returns_all(self, mock_get_coll):
+        """Should return all fields when fields is an empty string."""
+        mock_get_coll.return_value = _make_mock_collection([SAMPLE_DOC_FULL])
+
+        results = query_er_by_name("ER-431059", fields="")
+
+        assert len(results) == 1
+        # Should behave like fields=None (return all non-excluded)
+        assert "er_name" in results[0]
+        assert "embedding" not in results[0]
+
+    @patch("er_query.client._get_collection_ref")
+    def test_er_name_always_included(self, mock_get_coll):
+        """Should always include er_name even if not in fields list."""
+        mock_get_coll.return_value = _make_mock_collection([SAMPLE_DOC_FULL])
+
+        results = query_er_by_name("ER-431059", fields="product")
+
+        assert len(results) == 1
+        assert "er_name" in results[0]
+        assert results[0]["er_name"] == "ER-431059"
 
 
 # ---------------------------------------------------------------------------

@@ -7,7 +7,7 @@ query functions and return proper JSON responses.
 import json
 from unittest.mock import patch
 
-from mcp_server.server import search_er_by_date, search_er_by_email
+from mcp_server.server import get_er_fields, search_er_by_date, search_er_by_email
 
 SAMPLE_RESULT = [
     {
@@ -122,3 +122,111 @@ class TestSearchErByDate:
 
         parsed = json.loads(result)
         assert "Telefónica" in parsed[0]["account_name"]
+
+
+SAMPLE_ER_FIELDS_RESULT = [
+    {
+        "er_name": "ER-431059",
+        "fsa_status": "Completed",
+        "product": "Gemini Enterprise",
+    }
+]
+
+SAMPLE_ER_WORKLOAD_RESULT = [
+    {
+        "er_name": "ER-431059",
+        "workload_name": "AusPost - Agentspace",
+        "workload_gross_revenue": 1920000.0,
+        "workload_gross_revenue_tracking": [
+            {"amount": 1920000.0, "date": "2026-03-19"}
+        ],
+    }
+]
+
+
+class TestGetErFields:
+    """Tests for the get_er_fields MCP tool."""
+
+    @patch("mcp_server.server.query_er_by_name")
+    def test_returns_json_string(self, mock_query):
+        """Should return a valid JSON string."""
+        mock_query.return_value = SAMPLE_ER_FIELDS_RESULT
+
+        result = get_er_fields("ER-431059", "fsa_status,product")
+
+        parsed = json.loads(result)
+        assert isinstance(parsed, list)
+        assert len(parsed) == 1
+
+    @patch("mcp_server.server.query_er_by_name")
+    def test_returns_correct_field_data(self, mock_query):
+        """Should return the correct field data."""
+        mock_query.return_value = SAMPLE_ER_FIELDS_RESULT
+
+        result = get_er_fields("ER-431059", "fsa_status,product")
+
+        parsed = json.loads(result)
+        assert parsed[0]["er_name"] == "ER-431059"
+        assert parsed[0]["fsa_status"] == "Completed"
+        assert parsed[0]["product"] == "Gemini Enterprise"
+
+    @patch("mcp_server.server.query_er_by_name")
+    def test_returns_workload_fields(self, mock_query):
+        """Should return workload fields with nested data."""
+        mock_query.return_value = SAMPLE_ER_WORKLOAD_RESULT
+
+        result = get_er_fields(
+            "ER-431059",
+            "workload_name,workload_gross_revenue,workload_gross_revenue_tracking",
+        )
+
+        parsed = json.loads(result)
+        assert parsed[0]["workload_name"] == "AusPost - Agentspace"
+        assert parsed[0]["workload_gross_revenue"] == 1920000.0
+        assert len(parsed[0]["workload_gross_revenue_tracking"]) == 1
+
+    @patch("mcp_server.server.query_er_by_name")
+    def test_empty_result_for_nonexistent_er(self, mock_query):
+        """Should return '[]' when ER is not found."""
+        mock_query.return_value = []
+
+        result = get_er_fields("ER-999999", "fsa_status")
+
+        assert json.loads(result) == []
+
+    @patch("mcp_server.server.query_er_by_name")
+    def test_passes_params_to_query(self, mock_query):
+        """Should pass er_name and fields to the query function."""
+        mock_query.return_value = []
+
+        get_er_fields("ER-431059", "fsa_status,product")
+
+        mock_query.assert_called_once_with(
+            er_name="ER-431059", fields="fsa_status,product"
+        )
+
+    @patch("mcp_server.server.query_er_by_name")
+    def test_fields_none_when_not_provided(self, mock_query):
+        """Should pass fields=None when not provided."""
+        mock_query.return_value = []
+
+        get_er_fields("ER-431059")
+
+        mock_query.assert_called_once_with(er_name="ER-431059", fields=None)
+
+    @patch("mcp_server.server.query_er_by_name")
+    def test_handles_datetime_serialization(self, mock_query):
+        """Should handle non-JSON-serializable types via default=str."""
+        from datetime import datetime
+
+        mock_query.return_value = [
+            {
+                "er_name": "ER-431059",
+                "created_at": datetime(2025, 10, 30, 3, 8, 56),
+            }
+        ]
+
+        result = get_er_fields("ER-431059", "created_at")
+
+        parsed = json.loads(result)
+        assert "2025" in parsed[0]["created_at"]
