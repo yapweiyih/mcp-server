@@ -105,7 +105,6 @@ deploy-run:
 		--project $(PROJECT_ID) \
 		--region $(REGION) \
 		--image $(IMAGE_NAME) \
-		--allow-unauthenticated \
 		--set-env-vars="MCP_TRANSPORT=sse" \
 		--port 8080 \
 		--memory 512Mi \
