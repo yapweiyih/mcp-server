@@ -11,8 +11,13 @@ This skill enables you to query Expert Request (ER) data from a Firestore-backed
 
 ## Prerequisites
 
-- The ER MCP server must be running (either locally via stdio or remotely via SSE on Cloud Run)
+- The ER MCP server must be running (either locally via stdio or remotely via Cloud Run proxy)
 - GCP credentials with Firestore access to the `expert_requests_dev` collection
+- **For Cloud Run proxy:** Start the proxy first before using the MCP server:
+  ```bash
+  gcloud run services proxy er-mcp-server --region us-central1 --port=3000
+  ```
+  This makes the MCP server available at `http://127.0.0.1:3000`
 
 ## MCP Server Setup
 
@@ -35,13 +40,21 @@ Add to your MCP client configuration (e.g., `cline_mcp_settings.json`, `claude_d
 }
 ```
 
-### Option 2: Remote (SSE on Cloud Run)
+### Option 2: Remote (via Cloud Run Proxy)
+
+First, start the Cloud Run proxy in a separate terminal:
+
+```bash
+gcloud run services proxy er-mcp-server --region us-central1 --port=3000
+```
+
+Then configure your MCP client:
 
 ```json
 {
   "mcpServers": {
     "er-query": {
-      "url": "https://er-mcp-server-<project-hash>.<region>.run.app/sse"
+      "url": "http://127.0.0.1:3000/sse"
     }
   }
 }
