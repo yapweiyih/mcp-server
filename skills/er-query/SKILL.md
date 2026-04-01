@@ -11,36 +11,17 @@ This skill enables you to query Expert Request (ER) data from a Firestore-backed
 
 ## Prerequisites
 
-- The ER MCP server must be running (either locally via stdio or remotely via Cloud Run proxy)
-- GCP credentials with Firestore access to the `expert_requests_dev` collection
-- **For Cloud Run proxy:** Start the proxy first before using the MCP server:
-  ```bash
-  gcloud run services proxy er-mcp-server --region us-central1 --port=3000
-  ```
-  This makes the MCP server available at `http://127.0.0.1:3000`
+Before querying ER data, follow these steps:
 
-## MCP Server Setup
+1. **Verify the ER MCP server is connected** — check that the `er-query` MCP server is listed and available in your MCP client.
+2. **If not connected**, check whether the Cloud Run proxy is running:
+   ```bash
+   gcloud run services proxy er-mcp-server --region us-central1 --port=3000
+   ```
+   If it is not running, start it in a separate terminal. This makes the MCP server available at `http://127.0.0.1:3000`.
+3. GCP credentials with Firestore access to the `expert_requests_dev` collection must be configured.
 
-### Option 1: Local (stdio)
-
-Add to your MCP client configuration (e.g., `cline_mcp_settings.json`, `claude_desktop_config.json`):
-
-```json
-{
-  "mcpServers": {
-    "er-query": {
-      "command": "uv",
-      "args": ["run", "python", "-m", "mcp_server"],
-      "cwd": "/path/to/2026-mcp-review",
-      "env": {
-        "PYTHONPATH": "/path/to/2026-mcp-review"
-      }
-    }
-  }
-}
-```
-
-### Option 2: Remote (via Cloud Run Proxy)
+## MCP Server Setup (Cloud Run Proxy)
 
 First, start the Cloud Run proxy in a separate terminal:
 
@@ -48,7 +29,7 @@ First, start the Cloud Run proxy in a separate terminal:
 gcloud run services proxy er-mcp-server --region us-central1 --port=3000
 ```
 
-Then configure your MCP client:
+Then configure your MCP client (e.g., `cline_mcp_settings.json`, `claude_desktop_config.json`):
 
 ```json
 {
