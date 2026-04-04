@@ -51,25 +51,27 @@ async def _background_work(task_name: str, duration: int = 10) -> None:
     logger.info("Background task '%s' completed", task_name)
 
 
-def submit_long_task(task_name: str, tool_context: ToolContext) -> dict:
+def submit_long_task(task_name: str, duration: int, tool_context: ToolContext) -> dict:
     """Submit a dummy long-running task that runs in the background.
 
     This tool returns immediately with status 'submitted'. The actual work
-    (a 5-second sleep) runs asynchronously in the background. Use
-    check_task_status to poll for completion, or the agent will be
+    runs asynchronously in the background for the specified duration.
+    Use check_task_status to poll for completion, or the agent will be
     notified automatically on the next turn.
 
     Args:
         task_name: A short name for the task (e.g., 'data_sync').
+        duration: How long the task should run in seconds (e.g., 5).
 
     Returns:
-        A dict with 'status' and 'task_name' confirming the task was
-        submitted.
+        A dict with 'status', 'task_name', 'duration', and 'message'
+        confirming the task was submitted.
 
     Example return value:
         {
             'status': 'submitted',
             'task_name': 'data_sync',
+            'duration': 5,
             'message': "Task 'data_sync' submitted. It will complete in ~5 seconds."
         }
     """
@@ -85,12 +87,13 @@ def submit_long_task(task_name: str, tool_context: ToolContext) -> dict:
 
     # Fire-and-forget: schedule the background work
     loop = asyncio.get_event_loop()
-    loop.create_task(_background_work(task_name))
+    loop.create_task(_background_work(task_name, duration=duration))
 
     return {
         "status": "submitted",
         "task_name": task_name,
-        "message": f"Task '{task_name}' submitted. It will complete in ~5 seconds.",
+        "duration": duration,
+        "message": f"Task '{task_name}' submitted. It will complete in ~{duration} seconds.",
     }
 
 

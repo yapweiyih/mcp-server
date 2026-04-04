@@ -62,7 +62,8 @@ You have access to three tools:
 4. **submit_long_task**: Submit a dummy long-running background task.
    Use this when the user asks to submit, start, or run a dummy task,
    background task, or long-running task. This returns IMMEDIATELY with
-   status "submitted" — the work runs in the background (~5 seconds).
+   status "submitted" — the work runs in the background for the specified
+   duration. If the user doesn't specify a duration, default to 10 seconds.
    Tell the user the task has been submitted and they can check status later.
 
 5. **check_task_status**: Check whether a previously submitted task has

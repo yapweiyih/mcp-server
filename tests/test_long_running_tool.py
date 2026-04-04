@@ -56,10 +56,11 @@ class TestSubmitLongTask:
         with patch("adk_agent.tools.asyncio.get_event_loop") as mock_loop:
             mock_loop.return_value = MagicMock()
 
-            result = submit_long_task("test_task", mock_tool_context)
+            result = submit_long_task("test_task", 5, mock_tool_context)
 
         assert result["status"] == "submitted"
         assert result["task_name"] == "test_task"
+        assert result["duration"] == 5
         assert "submitted" in result["message"].lower()
 
     def test_sets_state_to_in_progress(self, mock_tool_context):
@@ -67,7 +68,7 @@ class TestSubmitLongTask:
         with patch("adk_agent.tools.asyncio.get_event_loop") as mock_loop:
             mock_loop.return_value = MagicMock()
 
-            submit_long_task("my_job", mock_tool_context)
+            submit_long_task("my_job", 10, mock_tool_context)
 
         assert mock_tool_context.state["task_status"] == "in_progress"
         assert mock_tool_context.state["task_name"] == "my_job"
@@ -77,7 +78,7 @@ class TestSubmitLongTask:
         with patch("adk_agent.tools.asyncio.get_event_loop") as mock_loop:
             mock_loop.return_value = MagicMock()
 
-            submit_long_task("registry_test", mock_tool_context)
+            submit_long_task("registry_test", 3, mock_tool_context)
 
         assert "registry_test" in _task_registry
         assert _task_registry["registry_test"]["status"] == "in_progress"
@@ -86,7 +87,7 @@ class TestSubmitLongTask:
         """Should call loop.create_task to schedule background work."""
         mock_loop = MagicMock()
         with patch("adk_agent.tools.asyncio.get_event_loop", return_value=mock_loop):
-            submit_long_task("bg_test", mock_tool_context)
+            submit_long_task("bg_test", 5, mock_tool_context)
 
         mock_loop.create_task.assert_called_once()
 
@@ -95,10 +96,20 @@ class TestSubmitLongTask:
         with patch("adk_agent.tools.asyncio.get_event_loop") as mock_loop:
             mock_loop.return_value = MagicMock()
 
-            result = submit_long_task("type_check", mock_tool_context)
+            result = submit_long_task("type_check", 7, mock_tool_context)
 
         assert isinstance(result, dict)
-        assert set(result.keys()) == {"status", "task_name", "message"}
+        assert set(result.keys()) == {"status", "task_name", "duration", "message"}
+
+    def test_duration_in_message(self, mock_tool_context):
+        """Should include the custom duration in the response message."""
+        with patch("adk_agent.tools.asyncio.get_event_loop") as mock_loop:
+            mock_loop.return_value = MagicMock()
+
+            result = submit_long_task("dur_test", 15, mock_tool_context)
+
+        assert "15" in result["message"]
+        assert result["duration"] == 15
 
 
 # ---------------------------------------------------------------------------

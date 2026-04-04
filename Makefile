@@ -78,7 +78,7 @@ mcp-test-tools:
 
 agent-web:
 	@echo "🌐 Starting ADK agent web UI..."
-	uv run adk web
+	uv run adk web adk_agent
 
 agent-run chat:
 	@echo "🤖 Starting ADK agent CLI chat..."
