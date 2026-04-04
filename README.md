@@ -14,22 +14,22 @@ User Query → ADK Agent (Gemini 2.0) → MCP Server (SSE) → Firestore
 
 ```
 ├── er_query/              # Firestore query functions
-│   ├── client.py          # query_er_by_email, query_er_by_date
-│   └── models.py          # ERRecord Pydantic model
+│   ├── client.py          # query_er_by_email, query_er_by_date, query_er_by_name
+│   └── models.py          # ERRecord Pydantic model (schema reference)
 ├── mcp_server/            # MCP server (FastMCP)
-│   ├── server.py          # MCP tool definitions (search_er_by_email, search_er_by_date)
+│   ├── server.py          # MCP tools: search_er_by_email, search_er_by_date, get_er_fields
 │   └── __main__.py        # Entry point: python -m mcp_server
 ├── adk_agent/             # ADK agent (Gemini 2.0 Flash)
 │   ├── agent.py           # root_agent with MCP toolset (stdio/SSE)
 │   └── .env               # Vertex AI config
 ├── tests/
-│   ├── test_er_query.py   # 16 unit tests (mocked Firestore)
-│   ├── test_mcp_server.py # 9 unit tests (mocked queries)
-│   ├── test_integration.py# 6 integration tests (real Firestore)
-│   ├── test_adk_agent.py  # 6 agent tests (local MCP + Vertex AI)
-│   └── test_cloud_mcp.py  # 6 cloud tests (Cloud Run MCP + ADK agent)
-├── wy-tutorial/
-│   └── approach.md        # Architecture & design decisions
+│   ├── test_er_query.py   # Unit tests (mocked Firestore)
+│   ├── test_mcp_server.py # Unit tests (mocked queries)
+│   ├── test_integration.py# Integration tests (real Firestore)
+│   ├── test_adk_agent.py  # Agent tests (local MCP + Vertex AI)
+│   └── test_cloud_mcp.py  # Cloud tests (Cloud Run MCP + ADK agent)
+├── skills/
+│   └── er-query/SKILL.md  # Agent skill definition
 ├── Dockerfile             # Cloud Run container
 ├── Makefile               # All commands
 ├── .env_dev               # Firestore config
@@ -101,20 +101,19 @@ make test-cloud
 
 ### (1) Firestore Query Functions ✅
 - Created `er_query/client.py` with Firestore client functions
-- Sample data in `er_431059.json`, database config in `.env_dev`
+- Sample data schema in `er_431059.json`, database config in `.env_dev`
 - Function params designed for easy MCP tool extension (flat types, dependency injection)
 - Supported queries:
   - `query_er_by_email(assigned_ce_email)` — retrieve ERs by assigned CE email
   - `query_er_by_date(year, month=None)` — retrieve ERs by created_at date (year or year/month)
+  - `query_er_by_name(er_name, fields=None)` — retrieve specific fields from an ER by name
 - Returns only required fields: `er_name`, `account_name`, `account_sub_region`, `assigned_ce_email`, `details`
-- 16 unit tests + 6 integration tests passing
 
 ### (2) MCP Server + Cloud Run Deployment ✅
-- `mcp_server/server.py` using FastMCP with `search_er_by_email` and `search_er_by_date` tools
+- `mcp_server/server.py` using FastMCP with `search_er_by_email`, `search_er_by_date`, and `get_er_fields` tools
 - Local testing via stdio mode (`make mcp-local`)
 - SSE mode for Cloud Run (`make mcp-sse`)
 - Deployed to Cloud Run via container build (`make deploy`)
-- 9 unit tests + 6 cloud end-to-end tests passing
 
 ### (3) ADK Agent ✅
 - `adk_agent/agent.py` with Gemini 2.0 Flash model
@@ -124,7 +123,6 @@ make test-cloud
   - Date queries (year only, year+month)
   - Edge cases (ambiguous queries, greetings)
   - ADK agent via Cloud Run MCP server (SSE)
-- 6 local agent tests + 2 cloud agent tests passing
 
 ### (4) Makefile ✅
 - `make test` — unit tests

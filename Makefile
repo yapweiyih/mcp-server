@@ -10,12 +10,13 @@
 #   make mcp-sse       - Start MCP server in SSE mode (for Cloud Run testing)
 #   make agent-web     - Start ADK agent web UI
 #   make agent-run     - Start ADK agent CLI
+#   make chat          - Start ADK agent CLI (alias for agent-run)
 #   make deploy        - Deploy MCP server to Cloud Run
 #   make lint          - Run linting checks
 #   make clean         - Clean build artifacts
 
 .PHONY: install test test-integration test-agent test-all \
-        mcp-local mcp-sse agent-web agent-run \
+        mcp-local mcp-sse agent-web agent-run chat \
         deploy docker-build docker-push deploy-run lint clean
 
 # Configuration
@@ -77,11 +78,12 @@ mcp-test-tools:
 
 agent-web:
 	@echo "🌐 Starting ADK agent web UI..."
-	uv run adk web adk_agent
+	uv run adk web
 
-agent-run:
-	@echo "🤖 Starting ADK agent CLI..."
-	uv run adk run adk_agent
+agent-run chat:
+	@echo "🤖 Starting ADK agent CLI chat..."
+	@echo "Type your questions about Expert Requests. Press Ctrl+C to exit."
+	uv run adk run
 
 # ============================================================
 # Deployment

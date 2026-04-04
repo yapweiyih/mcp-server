@@ -6,7 +6,6 @@ __pycache__/
 *.egg-info/
 tests/
 adk_agent/
-wy-tutorial/
 er_431059.json
 uv.lock
 .mypy_cache/

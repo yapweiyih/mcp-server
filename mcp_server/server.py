@@ -145,11 +145,7 @@ def main():
     - sse: For Cloud Run deployment (set MCP_TRANSPORT=sse)
     """
     transport = os.getenv("MCP_TRANSPORT", "stdio")
-
-    if transport == "sse":
-        mcp.run(transport="sse")
-    else:
-        mcp.run(transport="stdio")
+    mcp.run(transport=transport)
 
 
 if __name__ == "__main__":

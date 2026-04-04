@@ -45,7 +45,8 @@ async def test_tools_list():
 
             assert "search_er_by_email" in tool_names, "Missing search_er_by_email tool"
             assert "search_er_by_date" in tool_names, "Missing search_er_by_date tool"
-            print("   ✅ Both tools registered correctly")
+            assert "get_er_fields" in tool_names, "Missing get_er_fields tool"
+            print("   ✅ All 3 tools registered correctly")
 
 
 async def test_search_by_email():
@@ -68,7 +69,9 @@ async def test_search_by_email():
 
             print(f"   Found {len(records)} ERs")
             for r in records:
-                print(f"   - {r['er_name']}: {r['account_name']} ({r['account_sub_region']})")
+                print(
+                    f"   - {r['er_name']}: {r['account_name']} ({r['account_sub_region']})"
+                )
 
             assert len(records) >= 1, "Expected at least 1 ER for issein@google.com"
             assert any(
@@ -191,9 +194,11 @@ async def test_adk_agent_with_cloud_mcp():
             final_text = event.content.parts[0].text
 
     print(f"   Response: {final_text[:300]}...")
-    assert "431059" in final_text or "Australian Postal" in final_text or "issein" in final_text, (
-        f"Expected ER data in response, got: {final_text[:200]}"
-    )
+    assert (
+        "431059" in final_text
+        or "Australian Postal" in final_text
+        or "issein" in final_text
+    ), f"Expected ER data in response, got: {final_text[:200]}"
     print("   ✅ Agent correctly used Cloud Run MCP tool for email query")
 
     # --- Test 2: Date query ---
@@ -214,7 +219,9 @@ async def test_adk_agent_with_cloud_mcp():
             final_text2 = event.content.parts[0].text
 
     print(f"   Response: {final_text2[:300]}...")
-    assert "ER" in final_text2, f"Expected ER references in response, got: {final_text2[:200]}"
+    assert (
+        "ER" in final_text2
+    ), f"Expected ER references in response, got: {final_text2[:200]}"
     print("   ✅ Agent correctly used Cloud Run MCP tool for date query")
 
 

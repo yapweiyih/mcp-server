@@ -19,8 +19,6 @@ from datetime import datetime, timezone
 from dotenv import load_dotenv
 from google.cloud import firestore
 
-from er_query.models import ERRecord
-
 # Fields to project from Firestore documents
 _RETURN_FIELDS = [
     "er_name",
@@ -29,6 +27,19 @@ _RETURN_FIELDS = [
     "assigned_ce_email",
     "details",
 ]
+
+# Fields to always exclude from full document returns (large/internal)
+_EXCLUDE_FIELDS = frozenset(
+    {
+        "embedding",
+        "content_hash",
+        "account_vector_id",
+        "opportunity_vector_id",
+        "vector_id",
+        "last_embedded_at",
+        "needs_embedding",
+    }
+)
 
 
 def _get_firestore_client() -> firestore.Client:
@@ -178,16 +189,9 @@ def query_er_by_name(
             }
         ]
     """
-    # Fields to always exclude from full document returns (large/internal)
-    _EXCLUDE_FIELDS = {"embedding", "content_hash", "account_vector_id",
-                       "opportunity_vector_id", "vector_id", "last_embedded_at",
-                       "needs_embedding"}
-
     collection_ref = _get_collection_ref(client)
 
-    query = collection_ref.where(
-        filter=firestore.FieldFilter("er_name", "==", er_name)
-    )
+    query = collection_ref.where(filter=firestore.FieldFilter("er_name", "==", er_name))
 
     results = []
     for doc in query.stream():
@@ -205,10 +209,7 @@ def query_er_by_name(
                     record[field_name] = None  # Field not found in document
         else:
             # Return all fields except excluded ones
-            record = {
-                k: v for k, v in doc_dict.items()
-                if k not in _EXCLUDE_FIELDS
-            }
+            record = {k: v for k, v in doc_dict.items() if k not in _EXCLUDE_FIELDS}
 
         results.append(record)
 

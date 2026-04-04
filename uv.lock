@@ -486,7 +486,6 @@ name = "er-mcp-review"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "click" },
     { name = "google-adk" },
     { name = "google-cloud-firestore" },
     { name = "mcp", extra = ["cli"] },
@@ -503,7 +502,6 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "click", specifier = ">=8.1.0" },
     { name = "google-adk", specifier = ">=0.5.0" },
     { name = "google-cloud-firestore", specifier = ">=2.19.0" },
     { name = "mcp", extras = ["cli"], specifier = ">=1.0.0" },

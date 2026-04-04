@@ -19,6 +19,7 @@ ENV/
 .coverage
 htmlcov/
 .tox/
+.mypy_cache/
 
 # IDE / Editor
 .vscode/
@@ -41,3 +42,4 @@ temp/
 
 # Misc
 *.log
+adk_agent/.adk/
