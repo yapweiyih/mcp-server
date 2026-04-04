@@ -17,6 +17,7 @@
 
 .PHONY: install test test-integration test-agent test-all \
         mcp-local mcp-sse agent-web agent-run chat \
+        agui-server agui-frontend agui-dev \
         deploy docker-build docker-push deploy-run lint clean
 
 # Configuration
@@ -84,6 +85,31 @@ agent-run chat:
 	@echo "🤖 Starting ADK agent CLI chat..."
 	@echo "Type your questions about Expert Requests. Press Ctrl+C to exit."
 	uv run adk run adk_agent
+
+# ============================================================
+# AG-UI + CopilotKit
+# ============================================================
+
+agui-server:
+	@echo "🤖 Starting AG-UI server (ADK agent on port 8000)..."
+	uv run python agui_server.py
+
+agui-frontend:
+	@echo "🌐 Starting CopilotKit frontend (Next.js on port 3000)..."
+	cd frontend && npm run dev
+
+agui-install:
+	@echo "📦 Installing AG-UI frontend dependencies..."
+	cd frontend && npm install
+
+agui-dev:
+	@echo "🚀 Starting both AG-UI server and frontend..."
+	@echo "   Backend:  http://localhost:8000/agui"
+	@echo "   Frontend: http://localhost:3000"
+	@echo ""
+	@echo "Run in two terminals:"
+	@echo "  Terminal 1: make agui-server"
+	@echo "  Terminal 2: make agui-frontend"
 
 # ============================================================
 # Deployment
