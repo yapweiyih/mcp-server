@@ -28,6 +28,12 @@ from google.adk.tools.mcp_tool.mcp_session_manager import (
 )
 from mcp import StdioServerParameters
 
+from adk_agent.tools import (
+    check_pending_tasks_callback,
+    check_task_status,
+    submit_long_task,
+)
+
 AGENT_INSTRUCTION = """You are an Expert Request (ER) query assistant. You help users
 find information about Expert Requests from the Firestore database.
 
@@ -52,6 +58,18 @@ You have access to three tools:
    - Engagement: engagement_type, engagement_tier, engagement_priority
    Pass the requested field names as a comma-separated string in the `fields`
    parameter. If no specific fields are mentioned, omit `fields` to return all.
+
+4. **submit_long_task**: Submit a dummy long-running background task.
+   Use this when the user asks to submit, start, or run a dummy task,
+   background task, or long-running task. This returns IMMEDIATELY with
+   status "submitted" — the work runs in the background (~5 seconds).
+   Tell the user the task has been submitted and they can check status later.
+
+5. **check_task_status**: Check whether a previously submitted task has
+   completed. Use this when the user asks "is my task done?" or "check
+   status of <task_name>".
+
+{task_completed_notification}
 
 Guidelines:
 - Always use the appropriate tool to answer queries. Never make up ER data.
@@ -104,6 +122,11 @@ root_agent = Agent(
     name="er_query_agent",
     model="gemini-2.0-flash",
     instruction=AGENT_INSTRUCTION,
-    description="An agent that queries Expert Request data from Firestore",
-    tools=[_get_mcp_toolset()],
+    description="An agent that queries Expert Request data from Firestore and runs background tasks",
+    tools=[
+        _get_mcp_toolset(),
+        submit_long_task,
+        check_task_status,
+    ],
+    before_agent_callback=check_pending_tasks_callback,
 )

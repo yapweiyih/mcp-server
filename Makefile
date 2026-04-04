@@ -39,7 +39,7 @@ install:
 
 test:
 	@echo "🧪 Running unit tests..."
-	uv run pytest tests/test_er_query.py tests/test_mcp_server.py -v
+	uv run pytest tests/test_er_query.py tests/test_mcp_server.py tests/test_long_running_tool.py -v
 
 test-integration:
 	@echo "🔗 Running integration tests (requires GCP credentials)..."
@@ -83,7 +83,7 @@ agent-web:
 agent-run chat:
 	@echo "🤖 Starting ADK agent CLI chat..."
 	@echo "Type your questions about Expert Requests. Press Ctrl+C to exit."
-	uv run adk run
+	uv run adk run adk_agent
 
 # ============================================================
 # Deployment
@@ -127,6 +127,7 @@ lint:
 	uv run python -m py_compile er_query/models.py
 	uv run python -m py_compile mcp_server/server.py
 	uv run python -m py_compile adk_agent/agent.py
+	uv run python -m py_compile adk_agent/tools.py
 	@echo "✅ All files compile successfully"
 
 clean:
