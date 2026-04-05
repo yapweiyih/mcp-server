@@ -115,6 +115,17 @@ agui-dev:
 
 # ============================================================
 # A2A (Agent-to-Agent)
+#
+# Workflow:
+#   Step 1: make test-a2a                    — Run unit tests (no GCP needed)
+#   Step 2: make deploy-agent-engine-local   — Test A2A agent locally
+#   Step 3: make deploy-agent-engine         — Deploy to Agent Engine (returns RESOURCE_ID)
+#   Step 4: make test-a2a-remote RESOURCE_ID=<id>  — Call the deployed endpoint
+#   Step 5: make test-a2a-client RESOURCE_ID=<id>  — ADK agent calls remote A2A agent
+#
+# Local dev (no deployment):
+#   Terminal 1: make a2a-server              — Start local A2A server
+#   Terminal 2: make test-a2a-client-local   — ADK agent calls local A2A server
 # ============================================================
 
 a2a-server:
