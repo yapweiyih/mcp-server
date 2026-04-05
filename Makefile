@@ -128,37 +128,38 @@ agui-dev:
 #   Terminal 2: make test-a2a-client-local   — ADK agent calls local A2A server
 # ============================================================
 
-a2a-server:
-	@echo "🤝 Starting A2A server (ADK agent on port 8001)..."
-	uv run python -m a2a_app.server
-
 test-a2a:
 	@echo "🧪 Running A2A unit tests..."
 	uv run pytest tests/test_a2a_unit.py -v
 
-deploy-agent-engine:
-	@echo "🚀 Deploying to Vertex AI Agent Engine (A2A)..."
-	uv run python -m a2a_app.deploy
+a2a-server:
+	@echo "🤝 Starting A2A server locally (ADK agent on port 8001)..."
+	uv run python -m a2a_app.server
+
+test-a2a-client-local:
+	@echo "🤖 Testing ADK agent calling local A2A agent..."
+	@echo "  Make sure 'make a2a-server' is running in another terminal."
+	uv run python -m a2a_app.test_client_agent --local
 
 deploy-agent-engine-local:
 	@echo "🧪 Testing A2A agent locally before deployment..."
 	uv run python -m a2a_app.deploy --test-local
+
+deploy-agent-engine:
+	@echo "🚀 Deploying to Vertex AI Agent Engine (A2A)..."
+	uv run python -m a2a_app.deploy
 
 test-a2a-remote:
 	@echo "🧪 Testing deployed A2A agent on Agent Engine..."
 	@echo "  Usage: make test-a2a-remote RESOURCE_ID=<id>"
 	uv run python -m a2a_app.test_remote --resource-id $(RESOURCE_ID)
 
-test-a2a-client:
+test-a2a-client-remote:
 	@echo "🤖 Testing ADK agent calling remote A2A agent..."
 	@echo "  Usage: make test-a2a-client RESOURCE_ID=<id>"
 	@echo "     or: make test-a2a-client-local"
 	uv run python -m a2a_app.test_client_agent --resource-id $(RESOURCE_ID)
 
-test-a2a-client-local:
-	@echo "🤖 Testing ADK agent calling local A2A agent..."
-	@echo "  Make sure 'make a2a-server' is running in another terminal."
-	uv run python -m a2a_app.test_client_agent --local
 
 # ============================================================
 # Deployment (Cloud Run - MCP Server)

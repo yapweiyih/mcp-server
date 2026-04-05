@@ -273,6 +273,21 @@ def test_a2a_client(
     click.echo(f"  Message:     {message}")
     click.echo()
 
+    # Check if local server is reachable before running
+    if use_local:
+        import httpx
+
+        try:
+            resp = httpx.get(agent_card_url, timeout=3)
+            click.echo(f"✅ Local A2A server reachable (status {resp.status_code})")
+        except Exception:
+            click.echo(
+                "❌ Error: Cannot reach local A2A server at "
+                f"{agent_card_url}\n"
+                "   Start it first with: make a2a-server"
+            )
+            raise SystemExit(1)
+
     result = asyncio.run(
         run_orchestrator(
             agent_card_url=agent_card_url,
@@ -282,7 +297,7 @@ def test_a2a_client(
 
     click.echo("\n" + "=" * 60)
     click.echo("📄 Final Response from Orchestrator:")
-    click.echo(result)
+    click.echo(result or "(empty response — check server logs)")
     click.echo("\n✅ Agent-to-Agent test complete!")
 
 

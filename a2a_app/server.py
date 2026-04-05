@@ -29,8 +29,12 @@ Usage:
 import logging
 import os
 import sys
+import warnings
 
 from dotenv import load_dotenv
+
+# Suppress ADK experimental feature warnings (A2A support is marked experimental)
+warnings.filterwarnings("ignore", message=".*EXPERIMENTAL.*")
 
 load_dotenv("adk_agent/.env")
 
@@ -53,10 +57,12 @@ def create_a2a_app() -> None:
 
     The server runs on the port specified by A2A_PORT env var (default: 8001).
     """
+    import uvicorn
     from google.adk.a2a.utils.agent_to_a2a import to_a2a
 
     from adk_agent.agent import root_agent
 
+    host = "0.0.0.0"
     port = int(os.getenv("A2A_PORT", "8001"))
 
     print(
@@ -72,8 +78,9 @@ def create_a2a_app() -> None:
     print(f"  📇  Agent card     : http://localhost:{port}/.well-known/agent.json")
     print()
 
-    # to_a2a() starts a uvicorn server that blocks
-    to_a2a(root_agent, port=port)
+    # to_a2a() returns a Starlette app — run it with uvicorn
+    app = to_a2a(root_agent, host="localhost", port=port)
+    uvicorn.run(app, host=host, port=port)
 
 
 if __name__ == "__main__":
