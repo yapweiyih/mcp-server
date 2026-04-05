@@ -6,7 +6,7 @@ runs a filtered query, and returns only the subset of fields needed
 (er_name, account_name, account_sub_region, assigned_ce_email, details).
 
 Why Firestore instead of BigQuery?
-    The .env_dev config specifies DATABASE_ID and COLLECTION which are
+    The adk_agent/.env config specifies DATABASE_ID and COLLECTION which are
     Firestore concepts. The sample data structure (nested objects, arrays)
     also fits Firestore's document model better than BigQuery's tabular
     format. Firestore provides millisecond reads ideal for MCP tool
@@ -45,14 +45,14 @@ _EXCLUDE_FIELDS = frozenset(
 def _get_firestore_client() -> firestore.Client:
     """Create and return a Firestore client using environment configuration.
 
-    Loads connection settings from .env_dev file including PROJECT_ID
-    and DATABASE_ID.
+    Loads connection settings from adk_agent/.env file including
+    GOOGLE_CLOUD_PROJECT and DATABASE_ID.
 
     Returns:
         A configured Firestore client instance.
     """
-    load_dotenv(".env_dev")
-    project_id = os.getenv("PROJECT_ID")
+    load_dotenv("adk_agent/.env")
+    project_id = os.getenv("GOOGLE_CLOUD_PROJECT")
     database_id = os.getenv("DATABASE_ID")
 
     return firestore.Client(project=project_id, database=database_id)
@@ -69,7 +69,7 @@ def _get_collection_ref(
     Returns:
         A CollectionReference pointing to the expert_requests collection.
     """
-    load_dotenv(".env_dev")
+    load_dotenv("adk_agent/.env")
     collection_name = os.getenv("COLLECTION", "expert_requests_dev")
 
     if client is None:

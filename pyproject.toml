@@ -8,10 +8,13 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "pydantic>=2.0.0",
     "mcp[cli]>=1.0.0",
-    "google-adk>=1.16.0",
+    "google-adk[a2a]>=1.16.0",
     "ag-ui-adk>=0.5.0",
     "fastapi>=0.115.0",
     "uvicorn>=0.32.0",
+    "a2a-sdk>=0.3.4",
+    "google-cloud-aiplatform[adk,agent-engines]>=1.112",
+    "click>=8.3.1",
 ]
 
 [project.optional-dependencies]

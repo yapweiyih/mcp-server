@@ -32,7 +32,7 @@ User Query → ADK Agent (Gemini 2.0) → MCP Server (SSE) → Firestore
 │   └── er-query/SKILL.md  # Agent skill definition
 ├── Dockerfile             # Cloud Run container
 ├── Makefile               # All commands
-├── .env_dev               # Firestore config
+├── adk_agent/.env          # All env config (GCP + Firestore)
 └── pyproject.toml         # Dependencies
 ```
 
@@ -101,7 +101,7 @@ make test-cloud
 
 ### (1) Firestore Query Functions ✅
 - Created `er_query/client.py` with Firestore client functions
-- Sample data schema in `er_431059.json`, database config in `.env_dev`
+- Sample data schema in `er_431059.json`, database config in `adk_agent/.env`
 - Function params designed for easy MCP tool extension (flat types, dependency injection)
 - Supported queries:
   - `query_er_by_email(assigned_ce_email)` — retrieve ERs by assigned CE email

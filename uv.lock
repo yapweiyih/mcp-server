@@ -8,6 +8,22 @@ resolution-markers = [
 ]
 
 [[package]]
+name = "a2a-sdk"
+version = "0.3.25"
+source = { registry = "https://us-python.pkg.dev/artifact-foundry-prod/ah-3p-staging-python/simple/" }
+dependencies = [
+    { name = "google-api-core" },
+    { name = "httpx" },
+    { name = "httpx-sse" },
+    { name = "protobuf" },
+    { name = "pydantic" },
+]
+sdist = { url = "https://us-python.pkg.dev/artifact-foundry-prod/ah-3p-staging-python/a2a-sdk/a2a_sdk-0.3.25.tar.gz", hash = "sha256:afda85bab8d6af0c5d15e82f326c94190f6be8a901ce562d045a338b7127242f" }
+wheels = [
+    { url = "https://us-python.pkg.dev/artifact-foundry-prod/ah-3p-staging-python/a2a-sdk/a2a_sdk-0.3.25-py3-none-any.whl", hash = "sha256:2fce38faea82eb0b6f9f9c2bcf761b0d78612c80ef0e599b50d566db1b2654b5" },
+]
+
+[[package]]
 name = "ag-ui-adk"
 version = "0.5.2"
 source = { registry = "https://us-python.pkg.dev/artifact-foundry-prod/ah-3p-staging-python/simple/" }
@@ -525,9 +541,12 @@ name = "er-mcp-review"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "a2a-sdk" },
     { name = "ag-ui-adk" },
+    { name = "click" },
     { name = "fastapi" },
-    { name = "google-adk" },
+    { name = "google-adk", extra = ["a2a"] },
+    { name = "google-cloud-aiplatform", extra = ["adk", "agent-engines"] },
     { name = "google-cloud-firestore" },
     { name = "mcp", extra = ["cli"] },
     { name = "pydantic" },
@@ -544,9 +563,12 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "a2a-sdk", specifier = ">=0.3.4" },
     { name = "ag-ui-adk", specifier = ">=0.5.0" },
+    { name = "click", specifier = ">=8.3.1" },
     { name = "fastapi", specifier = ">=0.115.0" },
-    { name = "google-adk", specifier = ">=1.16.0" },
+    { name = "google-adk", extras = ["a2a"], specifier = ">=1.16.0" },
+    { name = "google-cloud-aiplatform", extras = ["adk", "agent-engines"], specifier = ">=1.112" },
     { name = "google-cloud-firestore", specifier = ">=2.19.0" },
     { name = "mcp", extras = ["cli"], specifier = ">=1.0.0" },
     { name = "pydantic", specifier = ">=2.0.0" },
@@ -735,6 +757,11 @@ wheels = [
     { url = "https://us-python.pkg.dev/artifact-foundry-prod/ah-3p-staging-python/google-adk/google_adk-1.28.0-py3-none-any.whl", hash = "sha256:8470c2e5a97bcef9a54283148be9f4ffaa88b3eefe3f55f269183f715d8830b6" },
 ]
 
+[package.optional-dependencies]
+a2a = [
+    { name = "a2a-sdk" },
+]
+
 [[package]]
 name = "google-api-core"
 version = "2.30.0"
@@ -831,6 +858,9 @@ wheels = [
 ]
 
 [package.optional-dependencies]
+adk = [
+    { name = "google-adk" },
+]
 agent-engines = [
     { name = "aiohttp" },
     { name = "cloudpickle" },

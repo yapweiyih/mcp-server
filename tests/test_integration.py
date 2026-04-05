@@ -16,9 +16,9 @@ pytestmark = pytest.mark.integration
 
 @pytest.fixture(autouse=True)
 def check_env():
-    """Skip integration tests if .env_dev is not configured."""
-    if not os.path.exists(".env_dev"):
-        pytest.skip("No .env_dev found — skipping integration tests")
+    """Skip integration tests if adk_agent/.env is not configured."""
+    if not os.path.exists("adk_agent/.env"):
+        pytest.skip("No adk_agent/.env found — skipping integration tests")
 
 
 class TestFirestoreIntegration:
@@ -29,7 +29,9 @@ class TestFirestoreIntegration:
         results = query_er_by_email("issein@google.com")
         print(f"\n📧 Results for issein@google.com: {len(results)} ERs found")
         for r in results:
-            print(f"  - {r['er_name']}: {r['account_name']} ({r['account_sub_region']})")
+            print(
+                f"  - {r['er_name']}: {r['account_name']} ({r['account_sub_region']})"
+            )
         assert isinstance(results, list)
         # We expect at least 1 result based on sample data
         assert len(results) >= 1

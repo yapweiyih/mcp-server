@@ -15,9 +15,11 @@
 #   make lint          - Run linting checks
 #   make clean         - Clean build artifacts
 
-.PHONY: install test test-integration test-agent test-all \
+.PHONY: install test test-integration test-agent test-a2a test-all \
         mcp-local mcp-sse agent-web agent-run chat \
         agui-server agui-frontend agui-dev \
+        a2a-server deploy-agent-engine deploy-agent-engine-local \
+        test-a2a-remote test-a2a-client \
         deploy docker-build docker-push deploy-run lint clean
 
 # Configuration
@@ -112,7 +114,43 @@ agui-dev:
 	@echo "  Terminal 2: make agui-frontend"
 
 # ============================================================
-# Deployment
+# A2A (Agent-to-Agent)
+# ============================================================
+
+a2a-server:
+	@echo "🤝 Starting A2A server (ADK agent on port 8001)..."
+	uv run python -m a2a_app.server
+
+test-a2a:
+	@echo "🧪 Running A2A unit tests..."
+	uv run pytest tests/test_a2a_unit.py -v
+
+deploy-agent-engine:
+	@echo "🚀 Deploying to Vertex AI Agent Engine (A2A)..."
+	uv run python -m a2a_app.deploy
+
+deploy-agent-engine-local:
+	@echo "🧪 Testing A2A agent locally before deployment..."
+	uv run python -m a2a_app.deploy --test-local
+
+test-a2a-remote:
+	@echo "🧪 Testing deployed A2A agent on Agent Engine..."
+	@echo "  Usage: make test-a2a-remote RESOURCE_ID=<id>"
+	uv run python -m a2a_app.test_remote --resource-id $(RESOURCE_ID)
+
+test-a2a-client:
+	@echo "🤖 Testing ADK agent calling remote A2A agent..."
+	@echo "  Usage: make test-a2a-client RESOURCE_ID=<id>"
+	@echo "     or: make test-a2a-client-local"
+	uv run python -m a2a_app.test_client_agent --resource-id $(RESOURCE_ID)
+
+test-a2a-client-local:
+	@echo "🤖 Testing ADK agent calling local A2A agent..."
+	@echo "  Make sure 'make a2a-server' is running in another terminal."
+	uv run python -m a2a_app.test_client_agent --local
+
+# ============================================================
+# Deployment (Cloud Run - MCP Server)
 # ============================================================
 
 deploy: docker-build deploy-run
@@ -154,6 +192,10 @@ lint:
 	uv run python -m py_compile mcp_server/server.py
 	uv run python -m py_compile adk_agent/agent.py
 	uv run python -m py_compile adk_agent/tools.py
+	uv run python -m py_compile a2a_app/server.py
+	uv run python -m py_compile a2a_app/deploy.py
+	uv run python -m py_compile a2a_app/test_remote.py
+	uv run python -m py_compile a2a_app/test_client_agent.py
 	@echo "✅ All files compile successfully"
 
 clean:
