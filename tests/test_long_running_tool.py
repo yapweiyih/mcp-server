@@ -5,6 +5,7 @@ Tests cover:
 - check_task_status: reading status from session state
 - check_pending_tasks_callback: one-shot notification delivery lifecycle
 - _background_work: append_event integration for completion and failure
+- _get_fresh_session: fresh session fetch to avoid stale session errors
 """
 
 import asyncio
@@ -14,6 +15,7 @@ import pytest
 
 from adk_agent.tools import (
     _background_work,
+    _get_fresh_session,
     check_pending_tasks_callback,
     check_task_status,
     submit_long_task,
@@ -22,9 +24,18 @@ from adk_agent.tools import (
 
 @pytest.fixture
 def mock_session_service():
-    """Create a mock session service with async append_event."""
+    """Create a mock session service with async methods."""
     service = MagicMock()
     service.append_event = AsyncMock()
+
+    # get_session returns a fresh session by default
+    fresh_session = MagicMock()
+    fresh_session.app_name = "test_app"
+    fresh_session.user_id = "user_123"
+    fresh_session.id = "session_456"
+    service.get_session = AsyncMock(return_value=fresh_session)
+    service._fresh_session = fresh_session  # expose for assertions
+
     return service
 
 
@@ -58,6 +69,37 @@ def mock_callback_context():
 
 
 # ---------------------------------------------------------------------------
+# Tests for _get_fresh_session
+# ---------------------------------------------------------------------------
+
+
+class TestGetFreshSession:
+    """Tests for the _get_fresh_session helper."""
+
+    async def test_returns_session_from_service(self, mock_session_service):
+        """Should call get_session and return the result."""
+        result = await _get_fresh_session(
+            mock_session_service, "test_app", "user_123", "session_456"
+        )
+
+        mock_session_service.get_session.assert_called_once_with(
+            app_name="test_app",
+            user_id="user_123",
+            session_id="session_456",
+        )
+        assert result is mock_session_service._fresh_session
+
+    async def test_raises_if_session_not_found(self, mock_session_service):
+        """Should raise ValueError if session service returns None."""
+        mock_session_service.get_session = AsyncMock(return_value=None)
+
+        with pytest.raises(ValueError, match="Session not found"):
+            await _get_fresh_session(
+                mock_session_service, "test_app", "user_123", "missing_session"
+            )
+
+
+# ---------------------------------------------------------------------------
 # Tests for submit_long_task
 # ---------------------------------------------------------------------------
 
@@ -87,8 +129,8 @@ class TestSubmitLongTask:
         assert mock_tool_context.state["task_status"] == "in_progress"
         assert mock_tool_context.state["task_name"] == "my_job"
 
-    def test_creates_background_task_with_session_refs(self, mock_tool_context):
-        """Should call loop.create_task with session service and session."""
+    def test_creates_background_task_with_session_ids(self, mock_tool_context):
+        """Should call loop.create_task passing session identifiers (not object)."""
         mock_loop = MagicMock()
         with patch("adk_agent.tools.asyncio.get_event_loop", return_value=mock_loop):
             submit_long_task("bg_test", 5, mock_tool_context)
@@ -256,15 +298,24 @@ class TestCheckPendingTasksCallback:
 class TestBackgroundWork:
     """Tests for the _background_work coroutine."""
 
-    async def test_completes_and_appends_event(
-        self, mock_session_service, mock_session
-    ):
-        """Should call session_service.append_event with completion state_delta."""
-        await _background_work("bg_test", 0, mock_session_service, mock_session)
+    async def test_completes_and_appends_event(self, mock_session_service):
+        """Should fetch fresh session and call append_event with completion state_delta."""
+        await _background_work(
+            "bg_test", 0, mock_session_service, "test_app", "user_123", "session_456"
+        )
 
+        # Should have fetched a fresh session
+        mock_session_service.get_session.assert_called_once_with(
+            app_name="test_app",
+            user_id="user_123",
+            session_id="session_456",
+        )
+
+        # Should have appended event to the fresh session
         mock_session_service.append_event.assert_called_once()
         call_args = mock_session_service.append_event.call_args
-        event = call_args[0][1]  # second positional arg is the Event
+        assert call_args[0][0] is mock_session_service._fresh_session
+        event = call_args[0][1]
 
         assert event.author == "system"
         assert event.invocation_id == "bg_bg_test"
@@ -272,32 +323,65 @@ class TestBackgroundWork:
         assert "bg_test" in event.actions.state_delta["task_result"]
         assert "bg_test" in event.actions.state_delta["task_completed_notification"]
 
-    async def test_event_contains_result_message(
-        self, mock_session_service, mock_session
-    ):
+    async def test_event_contains_result_message(self, mock_session_service):
         """Should include duration in the result message."""
-        await _background_work("msg_test", 0, mock_session_service, mock_session)
+        await _background_work(
+            "msg_test", 0, mock_session_service, "test_app", "user_123", "session_456"
+        )
 
         event = mock_session_service.append_event.call_args[0][1]
         assert "0s" in event.actions.state_delta["task_result"]
 
-    async def test_passes_session_to_append_event(
-        self, mock_session_service, mock_session
-    ):
-        """Should pass the session object to append_event for state lookup."""
-        await _background_work("session_test", 0, mock_session_service, mock_session)
+    async def test_passes_fresh_session_to_append_event(self, mock_session_service):
+        """Should pass the fresh (not stale) session to append_event."""
+        await _background_work(
+            "session_test",
+            0,
+            mock_session_service,
+            "test_app",
+            "user_123",
+            "session_456",
+        )
 
         call_args = mock_session_service.append_event.call_args
-        assert call_args[0][0] is mock_session  # first positional arg is session
+        # Should be the fresh session from get_session, not a stale one
+        assert call_args[0][0] is mock_session_service._fresh_session
 
-    async def test_handles_failure_gracefully(self, mock_session_service, mock_session):
+    async def test_handles_failure_gracefully(self, mock_session_service):
         """Should persist failure state via append_event when work raises."""
-        # Make sleep raise to simulate work failure
         with patch("adk_agent.tools.asyncio.sleep", side_effect=RuntimeError("boom")):
-            await _background_work("fail_test", 5, mock_session_service, mock_session)
+            await _background_work(
+                "fail_test",
+                5,
+                mock_session_service,
+                "test_app",
+                "user_123",
+                "session_456",
+            )
+
+        # Should have fetched a fresh session for the error event
+        mock_session_service.get_session.assert_called()
 
         # Should have appended a failure event
         mock_session_service.append_event.assert_called_once()
         event = mock_session_service.append_event.call_args[0][1]
         assert event.actions.state_delta["task_status"] == "failed"
         assert "FAILED" in event.actions.state_delta["task_completed_notification"]
+
+    async def test_survives_double_failure(self, mock_session_service):
+        """Should not crash if both the work AND error persistence fail."""
+        mock_session_service.get_session = AsyncMock(return_value=None)
+
+        with patch("adk_agent.tools.asyncio.sleep", side_effect=RuntimeError("boom")):
+            # Should not raise — the double failure is caught and logged
+            await _background_work(
+                "double_fail",
+                5,
+                mock_session_service,
+                "test_app",
+                "user_123",
+                "session_456",
+            )
+
+        # No event appended because get_session returned None → ValueError
+        mock_session_service.append_event.assert_not_called()

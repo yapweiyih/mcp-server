@@ -88,6 +88,7 @@ if event.actions and event.actions.state_delta:
 |-----------|---------|
 | **Within-invocation visibility** | If the user calls `check_task_status` in the _same_ invocation where the task was submitted, they may see "in_progress" even if the task finished (because the invocation uses a cached session copy). The user needs to send a new message to see the update. This is acceptable — the `before_agent_callback` handles proactive notification on the next turn. |
 | **Private API usage** | Accessing `tool_context._invocation_context.session_service` uses a private attribute. This is a pragmatic choice — ADK doesn't expose `session_service` publicly on `ToolContext`. Document this as a known coupling point. |
+| **Stale session handling** | The session captured at submit time becomes stale because the agent's response events update `last_update_time`. Persistent backends like `SqliteSessionService` reject `append_event` on stale sessions. The fix: pass session **identifiers** (not the object) to the background worker, and call `get_session()` to fetch a fresh copy before `append_event`. |
 
 ### When to use which approach
 

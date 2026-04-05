@@ -38,11 +38,50 @@ from google.adk.tools import ToolContext
 logger = logging.getLogger(__name__)
 
 
+async def _get_fresh_session(
+    session_service: BaseSessionService,
+    app_name: str,
+    user_id: str,
+    session_id: str,
+) -> Session:
+    """Fetch a fresh session from the session service.
+
+    The session captured at submit time becomes stale because the agent's
+    response events update last_update_time. Services like
+    SqliteSessionService reject append_event on stale sessions. This
+    helper fetches the latest version to avoid that error.
+
+    Args:
+        session_service: The ADK session service.
+        app_name: The application name.
+        user_id: The user identifier.
+        session_id: The session identifier.
+
+    Returns:
+        A fresh Session object with up-to-date last_update_time.
+
+    Raises:
+        ValueError: If the session cannot be found.
+    """
+    session = await session_service.get_session(
+        app_name=app_name,
+        user_id=user_id,
+        session_id=session_id,
+    )
+    if session is None:
+        raise ValueError(
+            f"Session not found: app={app_name}, user={user_id}, id={session_id}"
+        )
+    return session
+
+
 async def _background_work(
     task_name: str,
     duration: int,
     session_service: BaseSessionService,
-    session: Session,
+    app_name: str,
+    user_id: str,
+    session_id: str,
 ) -> None:
     """Run a long-running background job and persist the result via append_event.
 
@@ -51,11 +90,18 @@ async def _background_work(
     the runner loads the session, the updated state (including the
     completion notification) is automatically available.
 
+    Important: We fetch a fresh session via get_session() before calling
+    append_event, because the session captured at submit time becomes stale
+    (its last_update_time is outdated). SqliteSessionService and other
+    persistent backends reject stale sessions.
+
     Args:
         task_name: The name of the task to run.
         duration: How long to sleep in seconds (simulates actual work).
         session_service: The ADK session service for persisting state.
-        session: The session to append the completion event to.
+        app_name: The application name for session lookup.
+        user_id: The user identifier for session lookup.
+        session_id: The session identifier for session lookup.
     """
     logger.info("Background task '%s' started (duration=%ds)", task_name, duration)
 
@@ -63,6 +109,13 @@ async def _background_work(
         await asyncio.sleep(duration)
 
         result_message = f"Task '{task_name}' finished successfully after {duration}s."
+
+        # Fetch a fresh session to avoid stale last_update_time errors.
+        # The session captured at submit time is outdated because the agent's
+        # response events have updated the stored session since then.
+        fresh_session = await _get_fresh_session(
+            session_service, app_name, user_id, session_id
+        )
 
         # Write completion directly to session state via a system event.
         # This is the key difference from the in-memory registry approach:
@@ -83,7 +136,7 @@ async def _background_work(
                 }
             ),
         )
-        await session_service.append_event(session, completion_event)
+        await session_service.append_event(fresh_session, completion_event)
         logger.info(
             "Background task '%s' completed — event appended to session", task_name
         )
@@ -91,22 +144,30 @@ async def _background_work(
     except Exception:
         logger.exception("Background task '%s' failed", task_name)
 
-        # Persist the failure state so the agent can inform the user
-        error_event = Event(
-            invocation_id=f"bg_{task_name}",
-            author="system",
-            actions=EventActions(
-                state_delta={
-                    "task_status": "failed",
-                    "task_result": f"Task '{task_name}' failed unexpectedly.",
-                    "task_completed_notification": (
-                        f"IMPORTANT: Background task '{task_name}' has FAILED. "
-                        f"Please inform the user."
-                    ),
-                }
-            ),
-        )
-        await session_service.append_event(session, error_event)
+        # Try to persist the failure state so the agent can inform the user.
+        # We need a fresh session here too, in case the error happened after
+        # the work completed but during append_event.
+        try:
+            fresh_session = await _get_fresh_session(
+                session_service, app_name, user_id, session_id
+            )
+            error_event = Event(
+                invocation_id=f"bg_{task_name}",
+                author="system",
+                actions=EventActions(
+                    state_delta={
+                        "task_status": "failed",
+                        "task_result": f"Task '{task_name}' failed unexpectedly.",
+                        "task_completed_notification": (
+                            f"IMPORTANT: Background task '{task_name}' has FAILED. "
+                            f"Please inform the user."
+                        ),
+                    }
+                ),
+            )
+            await session_service.append_event(fresh_session, error_event)
+        except Exception:
+            logger.exception("Failed to persist error state for task '%s'", task_name)
 
 
 def submit_long_task(task_name: str, duration: int, tool_context: ToolContext) -> dict:
@@ -145,9 +206,21 @@ def submit_long_task(task_name: str, duration: int, tool_context: ToolContext) -
     session_service = invocation_ctx.session_service
     session = invocation_ctx.session
 
-    # Fire-and-forget: schedule the background work
+    # Fire-and-forget: schedule the background work.
+    # Pass session identifiers (not the session object) because the session
+    # becomes stale after the agent's response events update last_update_time.
+    # The background worker will fetch a fresh session before append_event.
     loop = asyncio.get_event_loop()
-    loop.create_task(_background_work(task_name, duration, session_service, session))
+    loop.create_task(
+        _background_work(
+            task_name,
+            duration,
+            session_service,
+            app_name=session.app_name,
+            user_id=session.user_id,
+            session_id=session.id,
+        )
+    )
 
     return {
         "status": "submitted",
