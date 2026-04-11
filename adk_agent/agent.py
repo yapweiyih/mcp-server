@@ -134,6 +134,41 @@ def get_er_fields(er_name: str, fields: str | None = None) -> str:
     return json.dumps(results, indent=2, ensure_ascii=False, default=str)
 
 
+def _get_identity_token(audience: str) -> str | None:
+    """Fetch a Google Cloud identity token for authenticated Cloud Run requests.
+
+    Tries two methods in order:
+    1. google.oauth2.id_token (works with service accounts, metadata server)
+    2. gcloud CLI fallback (works with user credentials in local dev)
+
+    Args:
+        audience: The target audience URL (the Cloud Run service URL).
+
+    Returns:
+        The identity token string, or None if credentials are unavailable.
+    """
+    # Method 1: google.oauth2.id_token (service accounts, Cloud Run, GKE)
+    try:
+        from google.auth.transport.requests import Request as AuthRequest
+        from google.oauth2 import id_token
+
+        return id_token.fetch_id_token(AuthRequest(), audience)
+    except Exception:
+        pass
+
+    # Method 2: gcloud CLI fallback (local development)
+    try:
+        import subprocess
+
+        return subprocess.check_output(
+            ["gcloud", "auth", "print-identity-token"],
+            text=True,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+    except Exception:
+        return None
+
+
 def _get_tools() -> list:
     """Get the appropriate tools based on environment config.
 
@@ -151,8 +186,24 @@ def _get_tools() -> list:
         from google.adk.tools.mcp_tool import McpToolset
         from google.adk.tools.mcp_tool.mcp_session_manager import SseConnectionParams
 
+        # Ensure URL ends with /sse (MCP SSE endpoint path)
+        sse_url = mcp_server_url.rstrip("/")
+        if not sse_url.endswith("/sse"):
+            sse_url = f"{sse_url}/sse"
+
+        # Cloud Run requires an identity token for authenticated services
+        headers = {}
+        token = _get_identity_token(mcp_server_url)
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+
         return [
-            McpToolset(connection_params=SseConnectionParams(url=mcp_server_url)),
+            McpToolset(
+                connection_params=SseConnectionParams(
+                    url=sse_url,
+                    headers=headers,
+                )
+            ),
             submit_long_task,
             check_task_status,
         ]
