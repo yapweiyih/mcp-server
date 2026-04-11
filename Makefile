@@ -127,4 +127,4 @@ lint:
 	uv run python -c "import py_compile, glob; [py_compile.compile(f, doraise=True) for f in glob.glob('**/*.py', recursive=True) if '.venv' not in f]"
 
 clean:
-	find . -type d \( -name __pycache__ -o -name .pytest_cache -o -name '*.egg-info' \) -exec rm -rf {} + 2>/dev/null; true
+	find . -type d \( -name __pycache__ -o -name .pytest_cache -o -name '*.egg-info' -o -name .adk \) -exec rm -rf {} + 2>/dev/null; true
