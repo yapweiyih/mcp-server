@@ -100,7 +100,7 @@ test-a2a-remote:
 	uv run python -m a2a_app.test_remote $(if $(RESOURCE_ID),--resource-id $(RESOURCE_ID))
 
 test-a2a-client-remote:
-	uv run python -m a2a_app.test_client_agent --resource-id $(RESOURCE_ID)
+	uv run python -m a2a_app.test_client_agent $(if $(RESOURCE_ID),--resource-id $(RESOURCE_ID))
 
 # ---------- Deploy ----------
 

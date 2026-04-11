@@ -239,12 +239,12 @@ def test_a2a_client(
 ) -> None:
     """Test an ADK agent calling a remote A2A agent."""
 
+    resource_id = resource_id or os.getenv("A2A_ENGINE_ID")
     if not resource_id and not use_local:
-        click.echo(
-            "❌ Error: Provide --resource-id for Agent Engine "
-            "or --local for local A2A server."
+        raise click.UsageError(
+            "Missing --resource-id. Set A2A_ENGINE_ID in adk_agent/.env, "
+            "pass --resource-id, or use --local."
         )
-        raise SystemExit(1)
 
     project_id = project_id or os.getenv("GOOGLE_CLOUD_PROJECT", "ikigai-dev-376122")
     location = location or os.getenv("GOOGLE_CLOUD_LOCATION", "us-central1")
