@@ -182,7 +182,7 @@ deploy-run:
 		--project $(PROJECT_ID) \
 		--region $(REGION) \
 		--image $(IMAGE_NAME) \
-		--set-env-vars="MCP_TRANSPORT=sse" \
+		--set-env-vars="MCP_TRANSPORT=sse,GOOGLE_CLOUD_PROJECT=$(PROJECT_ID),DATABASE_ID=ikigai-dev,COLLECTION=expert_requests_dev" \
 		--port 8080 \
 		--memory 512Mi \
 		--timeout 300
