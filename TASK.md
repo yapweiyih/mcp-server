@@ -1,6 +1,8 @@
 # Who You Are
 - You are an autonomous AI agent
+- Clarify if any before you start
 - Direct, clear, and concise. Omit fluff. Do not use filler phrases like "I can help with that" or "Here is the information." Just deliver the output.
+- Try your best to complete the task correctly.
 
 # Core Rules
 - **Security First:** Never execute destructive shell commands (`rm`, `drop`, `sudo`, etc.) without explicit user confirmation.
@@ -8,48 +10,11 @@
 - **Honesty:** You are an AI. Do not claim to have feelings, but act with high competence and logical reasoning.
 
 # Main Tasks
-
-- (1) Create python functions using Firestore client to retrieve ER (Expert Request) data based on query. Design function input params in a way that can be easily extended to MCP server tools later (flat types, no complex objects)
-- Sample data schema in `er_431059.json`
-- Database config is in `.env_dev`
-- Support the following types of query efficiently:
-  - Retrieve ERs based on input email, e.g. `assigned_ce_email=issein@google.com`
-  - Retrieve ERs based on input year, or year+month, based on `created_at` date
-  - Note: `created_at` in Firestore is a native Timestamp (DatetimeWithNanoseconds), not a string — use `datetime` objects for range comparisons
-  - Return results only need to include the following fields:
-    - `er_name`
-    - `account_name`
-    - `account_sub_region`
-    - `assigned_ce_email`
-    - `details`
-- Test every function locally with different input params (pytest with mocks + integration tests against actual Firestore) to ensure it is working
-
-- (2) Once local tests pass, wrap the query functions as MCP server tools using FastMCP
-  - Support both `stdio` (local dev) and `sse` (Cloud Run) transport modes via env var
-  - First run a local MCP server to ensure it is working (test via stdio JSON-RPC)
-  - Once pass all local tests, deploy to Cloud Run
-    - Create Dockerfile, build via Cloud Build, deploy with `gcloud run deploy`
-  - Run end-to-end cloud tests: connect to deployed MCP server via SSE, verify tools/list and tool calls return correct data
-
-- (3) Build an ADK agent (`adk_agent/`) using `gemini-2.0-flash` that uses these MCP tools to answer user natural language queries about ERs
-  - Support connecting to MCP server via both stdio (local) and SSE (Cloud Run)
-  - Create different prompts/queries to ensure agent returns the correct answer:
-    - Email query with known/unknown email
-    - Year query, year+month query
-    - Ambiguous query, general greeting
-  - Test agent connecting to both local and remote (Cloud Run) MCP server
-
-- (4) update MCP tool to be able to support the following types of query:
-  - for ER-431059, show me the fsa_asset fsa_tatus fields
-  - for ER-431059, show me the details, product fields
-  - for ER-431059, show me the workload_name, workload_gross_revenue, workload_gross_revenue_tracking
-
-- (5) show me how to build a new agent skill that can be installed using "npx skills my-er-skill"
-  - Show me how to do this by creating SKILL.md that guide agent to leverage on this ER MCP server.
-  - how to publish to https://skills.sh/
-  - do not publish until i tell you to so
-
-- You should complete this task autonomously, ensure all valid use cases and test cases are covered
-- Commit your code for every logical point that has been tested working with clear message, and move on to next features
-- Create a Makefile to easily run all the above tests (unit, integration, agent, cloud, deploy, lint, clean, etc.)
-- Before you complete the task, do a final validation to see if you can improve or if there is any bug
+- ensure all import relative path is correct, any other things that is not correct
+- You must ensure adk_agent is deployed to agent engine successfully, the deployment can take 5mins ( fp_deploy.py)
+- you must ensure all local test, deployment, cloud test for agent engine are correct
+- register agent engine as custom agent on gemini enterprise using as_register.sh
+- Use ge_stream_assist_sharepoint.py to streamassist API to test custom agent on gemini enterprise
+- Check that custom agent can be found here https://vertexaisearch.cloud.google.com/home/cid/a558f756-6409-47aa-a388-4ba6829f8291/r/agents under "From your organization" section. You may need to click "Show more"
+- Now click the agent, put in the query in the text box and click send button.
+- Check there is response coming back.
