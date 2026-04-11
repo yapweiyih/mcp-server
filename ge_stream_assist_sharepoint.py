@@ -13,12 +13,13 @@
 # limitations under the License.
 
 import json
-import random
 import logging
 import os
-import requests
+import random
+
 import google.auth
 import google.auth.transport.requests
+import requests
 from dotenv import load_dotenv
 
 logging.basicConfig(
@@ -387,7 +388,7 @@ if __name__ == "__main__":
             print(json.dumps(client.data_store_specs, indent=2))
 
         print("\n--- Querying Assistant ---")
-        prompt = "what sharepoint doc do i have?"
+        prompt = "What expert requests are assigned to weiyih@google.com?"
         response = client.query_assistant(prompt)
 
         # Save raw response to a json file (debug mode)
