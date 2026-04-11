@@ -3,6 +3,7 @@
 # Usage:
 #   make install       - Install all dependencies
 #   make test          - Run unit tests only
+#   make test-mcp      - Start MCP SSE server, verify tools/list, then stop
 #   make test-integration - Run integration tests (requires GCP credentials)
 #   make test-agent    - Run ADK agent tests (requires GCP + Vertex AI)
 #   make test-all      - Run all tests
@@ -15,7 +16,7 @@
 #   make lint          - Run linting checks
 #   make clean         - Clean build artifacts
 
-.PHONY: install test test-integration test-agent test-a2a test-all \
+.PHONY: install test test-mcp test-integration test-agent test-a2a test-all \
         mcp-local mcp-sse agent-web agent-run chat \
         agui-server agui-frontend agui-dev \
         a2a-server deploy-agent-engine deploy-agent-engine-local \
@@ -37,7 +38,7 @@ install:
 	uv sync --extra dev
 
 # ============================================================
-# Testing
+# Test ER feature (local mock, firestore, then agent)
 # ============================================================
 
 test:
@@ -69,11 +70,9 @@ mcp-sse:
 	@echo "🌐 Starting MCP server (SSE mode on port 8080)..."
 	MCP_TRANSPORT=sse PORT=8080 uv run python -m mcp_server
 
-mcp-test-tools:
-	@echo "🔍 Testing MCP tools/list..."
-	@echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}\n{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}' \
-		| uv run python -m mcp_server 2>/dev/null \
-		| python3 -c "import sys,json; [print(json.dumps(json.loads(l),indent=2)) for l in sys.stdin]"
+test-mcp:
+	@echo "🧪 Testing MCP SSE server (start → tools/list → stop)..."
+	uv run python tests/test_mcp_sse.py
 
 # ============================================================
 # ADK Agent
