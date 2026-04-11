@@ -20,7 +20,6 @@ RUN pip install --no-cache-dir \
 # Copy application code
 COPY er_query/ er_query/
 COPY mcp_server/ mcp_server/
-COPY .env_dev .env_dev
 
 # Cloud Run sets PORT env var (default 8080)
 ENV PORT=8080
