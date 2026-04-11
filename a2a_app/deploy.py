@@ -36,6 +36,11 @@ from dotenv import load_dotenv
 
 load_dotenv("adk_agent/.env")
 
+# Remove MCP_SERVER_URL so the agent uses direct function tools instead
+# of McpToolset. McpToolset can't connect to the local MCP server from
+# Agent Engine, leaving only submit_long_task and check_task_status.
+os.environ.pop("MCP_SERVER_URL", None)
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
