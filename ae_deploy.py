@@ -78,6 +78,12 @@ def load_requirements_from_pyproject() -> list[str]:
         return []
 
 
+# Remove MCP_SERVER_URL so the agent uses direct function tools instead
+# of McpToolset. McpToolset holds SSE connections (TextIOWrapper) that
+# cannot be pickled for Agent Engine deployment. Direct functions call
+# Firestore directly and are fully picklable.
+os.environ.pop("MCP_SERVER_URL", None)
+
 EXTRA_PACKAGES = ["./adk_agent"]
 REQUIREMENTS = load_requirements_from_pyproject()
 logging.getLogger("google").setLevel(logging.ERROR)
