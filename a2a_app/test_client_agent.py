@@ -62,6 +62,35 @@ def _build_orchestrator_with_remote_a2a(
     from google.adk.agents import Agent
     from google.adk.agents.remote_a2a_agent import RemoteA2aAgent
 
+    # For AgentCard objects (Agent Engine), create an authenticated client
+    # with the correct transport (HTTP+JSON, not the default jsonrpc).
+    kwargs = {}
+    if not isinstance(agent_card, str):
+        import httpx
+        from a2a.client import A2AClientConfig as ClientConfig
+        from a2a.client import A2AClientFactory as ClientFactory
+        from a2a.types import TransportProtocol
+        from google.auth import default
+        from google.auth.transport.requests import Request
+
+        credentials, _ = default(
+            scopes=["https://www.googleapis.com/auth/cloud-platform"]
+        )
+        credentials.refresh(Request())
+
+        kwargs["a2a_client_factory"] = ClientFactory(
+            config=ClientConfig(
+                httpx_client=httpx.AsyncClient(
+                    headers={
+                        "Authorization": f"Bearer {credentials.token}",
+                        "Content-Type": "application/json",
+                    },
+                    timeout=httpx.Timeout(timeout=120),
+                ),
+                supported_transports=[TransportProtocol.http_json],
+            ),
+        )
+
     # Create a remote A2A agent reference
     remote_er_agent = RemoteA2aAgent(
         name="remote_er_query_agent",
@@ -71,6 +100,7 @@ def _build_orchestrator_with_remote_a2a(
             "Delegate any questions about Expert Requests to this agent."
         ),
         agent_card=agent_card,
+        **kwargs,
     )
 
     # Build the local orchestrator
