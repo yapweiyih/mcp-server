@@ -84,7 +84,7 @@ def load_requirements_from_pyproject() -> list[str]:
 # Firestore directly and are fully picklable.
 os.environ.pop("MCP_SERVER_URL", None)
 
-EXTRA_PACKAGES = ["./adk_agent"]
+EXTRA_PACKAGES = ["./adk_agent", "./er_query"]
 REQUIREMENTS = load_requirements_from_pyproject()
 logging.getLogger("google").setLevel(logging.ERROR)
 
