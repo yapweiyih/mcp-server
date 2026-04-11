@@ -16,8 +16,9 @@
 #   make agui-frontend  — CopilotKit frontend (port 3000)
 #
 # Deploy:
-#   make deploy              — Build + deploy MCP to Cloud Run
-#   make deploy-agent-engine — Deploy A2A to Vertex AI Agent Engine
+#   make deploy-mcp-server-cloudrun — Build + deploy MCP to Cloud Run
+#   make deploy-adk-agent-engine    — Deploy ADK agent to Agent Engine
+#   make deploy-a2a-agent-engine    — Deploy A2A agent to Agent Engine
 #
 # A2A local dev:
 #   Terminal 1: make a2a-server
@@ -28,7 +29,7 @@
         agent-web agent-chat \
         agui-server agui-frontend agui-install \
         a2a-server test-a2a test-a2a-client-local \
-        deploy deploy-agent-engine \
+        deploy-mcp-server-cloudrun deploy-adk-agent-engine deploy-a2a-agent-engine \
         test-a2a-remote test-a2a-client-remote test-cloud
 
 # ---------- Configuration ----------
@@ -103,7 +104,7 @@ test-a2a-client-remote:
 
 # ---------- Deploy ----------
 
-deploy:
+deploy-mcp-server-cloudrun:
 	gcloud builds submit --tag $(IMAGE_NAME) --project $(PROJECT_ID) --region $(REGION)
 	gcloud run deploy $(SERVICE_NAME) \
 		--project $(PROJECT_ID) \
@@ -114,7 +115,10 @@ deploy:
 		--memory 512Mi \
 		--timeout 300
 
-deploy-agent-engine:
+deploy-adk-agent-engine:
+	uv run python ae_deploy.py
+
+deploy-a2a-agent-engine:
 	uv run python -m a2a_app.deploy
 
 # ---------- Utilities ----------
