@@ -44,7 +44,7 @@ logger = logging.getLogger(__name__)
 
 
 def _build_orchestrator_with_remote_a2a(
-    agent_card_url: str,
+    agent_card,
 ) -> "Agent":
     """Build a local ADK orchestrator that delegates to a remote A2A agent.
 
@@ -53,9 +53,8 @@ def _build_orchestrator_with_remote_a2a(
     delegates to the remote ER Query agent via A2A protocol.
 
     Args:
-        agent_card_url: URL to the remote agent's card endpoint.
-            For local: http://localhost:8001/.well-known/agent.json
-            For Agent Engine: constructed from resource ID.
+        agent_card: Either a URL string (for local servers) or an AgentCard
+            object (for Agent Engine, pre-fetched via Vertex AI SDK).
 
     Returns:
         Agent: A configured ADK agent with remote A2A sub-agent.
@@ -71,7 +70,7 @@ def _build_orchestrator_with_remote_a2a(
             "Firestore. It can search ERs by email, date, or specific fields. "
             "Delegate any questions about Expert Requests to this agent."
         ),
-        agent_card=agent_card_url,
+        agent_card=agent_card,
     )
 
     # Build the local orchestrator
@@ -100,7 +99,7 @@ def _build_orchestrator_with_remote_a2a(
 
 
 async def run_orchestrator(
-    agent_card_url: str,
+    agent_card,
     message: str,
 ) -> str:
     """Run the orchestrator agent with a user message.
@@ -109,7 +108,7 @@ async def run_orchestrator(
     through the orchestrator which may delegate to the remote A2A agent.
 
     Args:
-        agent_card_url: URL to the remote agent's agent card.
+        agent_card: AgentCard object or URL string for the remote agent.
         message: The user's query message.
 
     Returns:
@@ -119,7 +118,7 @@ async def run_orchestrator(
     from google.adk.sessions import InMemorySessionService
     from google.genai import types
 
-    orchestrator = _build_orchestrator_with_remote_a2a(agent_card_url)
+    orchestrator = _build_orchestrator_with_remote_a2a(agent_card)
 
     session_service = InMemorySessionService()
     runner = Runner(
@@ -134,7 +133,7 @@ async def run_orchestrator(
     )
 
     click.echo(f"📨 Sending to orchestrator: {message}")
-    click.echo(f"🔗 Remote agent card: {agent_card_url}")
+    click.echo(f"🔗 Remote agent card: {agent_card}")
     click.echo()
 
     final_text = ""
@@ -177,16 +176,19 @@ async def run_orchestrator(
     return final_text or last_agent_text
 
 
-def _get_agent_card_url_from_resource(
+async def _fetch_agent_card_from_engine(
     project_id: str,
     location: str,
     resource_id: str,
-) -> str:
-    """Get the agent card URL for a deployed Agent Engine A2A agent.
+):
+    """Fetch the AgentCard from a deployed Agent Engine A2A agent.
 
-    For Agent Engine deployments, the agent card URL is constructed from
-    the resource name. The RemoteA2aAgent uses this to discover the
-    remote agent's capabilities.
+    Agent Engine doesn't expose /.well-known/agent.json as a static URL.
+    Instead, the agent card is served through the Vertex AI API via the
+    authenticated `handle_authenticated_agent_card()` method.
+
+    This function uses the Vertex AI SDK to fetch the card and returns
+    an AgentCard object that can be passed directly to RemoteA2aAgent.
 
     Args:
         project_id: GCP project ID.
@@ -194,17 +196,34 @@ def _get_agent_card_url_from_resource(
         resource_id: Agent Engine resource ID.
 
     Returns:
-        The full URL to the agent's well-known agent card endpoint.
+        AgentCard: The resolved agent card object.
     """
-    # Agent Engine A2A URL pattern
-    # The agent card is available at the authenticated endpoint
-    # RemoteA2aAgent handles the discovery
-    base_url = (
-        f"https://{location}-aiplatform.googleapis.com/v1beta1/"
-        f"projects/{project_id}/locations/{location}/"
-        f"reasoningEngines/{resource_id}"
+    import vertexai
+    from a2a.types import AgentCard
+    from google.genai import types as genai_types
+
+    client = vertexai.Client(
+        project=project_id,
+        location=location,
+        http_options=genai_types.HttpOptions(api_version="v1beta1"),
     )
-    return f"{base_url}/.well-known/agent.json"
+
+    resource_name = (
+        f"projects/{project_id}/locations/{location}" f"/reasoningEngines/{resource_id}"
+    )
+    remote_agent = client.agent_engines.get(name=resource_name)
+
+    card_raw = await remote_agent.handle_authenticated_agent_card()
+
+    # Normalize to AgentCard object
+    if isinstance(card_raw, AgentCard):
+        return card_raw
+    elif isinstance(card_raw, dict):
+        return AgentCard(**card_raw)
+    elif hasattr(card_raw, "model_dump"):
+        return AgentCard(**card_raw.model_dump(exclude_none=True))
+    else:
+        return AgentCard(**dict(card_raw))
 
 
 @click.command()
@@ -265,14 +284,6 @@ def test_a2a_client(
     project_id = project_id or os.getenv("GOOGLE_CLOUD_PROJECT", "ikigai-dev-376122")
     location = location or os.getenv("GOOGLE_CLOUD_LOCATION", "us-central1")
 
-    # Determine agent card URL
-    if use_local:
-        agent_card_url = f"http://localhost:{local_port}/.well-known/agent.json"
-    else:
-        agent_card_url = _get_agent_card_url_from_resource(
-            project_id, location, resource_id
-        )
-
     print(
         """
     ╔═══════════════════════════════════════════════════════════╗
@@ -283,14 +294,17 @@ def test_a2a_client(
     """
     )
 
-    click.echo(f"📋 Test Parameters:")
-    click.echo(f"  Mode:        {'Local' if use_local else 'Agent Engine'}")
-    click.echo(f"  Agent Card:  {agent_card_url}")
-    click.echo(f"  Message:     {message}")
-    click.echo()
-
-    # Check if local server is reachable before running
+    # Resolve agent card: URL string for local, AgentCard object for Agent Engine
     if use_local:
+        agent_card_url = f"http://localhost:{local_port}/.well-known/agent.json"
+        agent_card = agent_card_url  # RemoteA2aAgent fetches from URL
+
+        click.echo(f"📋 Test Parameters:")
+        click.echo(f"  Mode:        Local")
+        click.echo(f"  Agent Card:  {agent_card_url}")
+        click.echo(f"  Message:     {message}")
+        click.echo()
+
         import httpx
 
         try:
@@ -303,10 +317,27 @@ def test_a2a_client(
                 "   Start it first with: make a2a-server"
             )
             raise SystemExit(1)
+    else:
+        # Agent Engine: fetch AgentCard via Vertex AI SDK (authenticated).
+        # The /.well-known/agent.json URL doesn't work for Agent Engine —
+        # agent cards are served through the Vertex AI API, not as static files.
+        click.echo(f"📋 Test Parameters:")
+        click.echo(f"  Mode:        Agent Engine")
+        click.echo(f"  Resource ID: {resource_id}")
+        click.echo(f"  Project:     {project_id}")
+        click.echo(f"  Location:    {location}")
+        click.echo(f"  Message:     {message}")
+        click.echo()
+
+        click.echo("📇 Fetching agent card from Agent Engine...")
+        agent_card = asyncio.run(
+            _fetch_agent_card_from_engine(project_id, location, resource_id)
+        )
+        click.echo(f"✅ Agent card resolved: {agent_card.name}")
 
     result = asyncio.run(
         run_orchestrator(
-            agent_card_url=agent_card_url,
+            agent_card=agent_card,
             message=message,
         )
     )
