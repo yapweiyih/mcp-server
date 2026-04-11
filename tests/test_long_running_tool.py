@@ -50,6 +50,24 @@ def mock_session():
 
 
 @pytest.fixture
+def mock_event_loop():
+    """Create a mock event loop that properly closes unawaited coroutines.
+
+    When submit_long_task calls loop.create_task(_background_work(...)),
+    the mock needs to close the coroutine to avoid 'was never awaited' warnings.
+    """
+    mock_loop = MagicMock()
+
+    def _close_coroutine(coro):
+        """Close the coroutine so Python doesn't warn about it being unawaited."""
+        coro.close()
+        return MagicMock()  # return a mock Task
+
+    mock_loop.create_task = MagicMock(side_effect=_close_coroutine)
+    return mock_loop
+
+
+@pytest.fixture
 def mock_tool_context(mock_session_service, mock_session):
     """Create a mock ToolContext with state dict and invocation context."""
     ctx = MagicMock()
@@ -107,11 +125,13 @@ class TestGetFreshSession:
 class TestSubmitLongTask:
     """Tests for the submit_long_task function."""
 
-    def test_returns_immediately_with_submitted_status(self, mock_tool_context):
+    def test_returns_immediately_with_submitted_status(
+        self, mock_tool_context, mock_event_loop
+    ):
         """Should return immediately with status 'submitted', not block."""
-        with patch("adk_agent.tools.asyncio.get_event_loop") as mock_loop:
-            mock_loop.return_value = MagicMock()
-
+        with patch(
+            "adk_agent.tools.asyncio.get_event_loop", return_value=mock_event_loop
+        ):
             result = submit_long_task("test_task", 5, mock_tool_context)
 
         assert result["status"] == "submitted"
@@ -119,39 +139,42 @@ class TestSubmitLongTask:
         assert result["duration"] == 5
         assert "submitted" in result["message"].lower()
 
-    def test_sets_state_to_in_progress(self, mock_tool_context):
+    def test_sets_state_to_in_progress(self, mock_tool_context, mock_event_loop):
         """Should update session state to in_progress."""
-        with patch("adk_agent.tools.asyncio.get_event_loop") as mock_loop:
-            mock_loop.return_value = MagicMock()
-
+        with patch(
+            "adk_agent.tools.asyncio.get_event_loop", return_value=mock_event_loop
+        ):
             submit_long_task("my_job", 10, mock_tool_context)
 
         assert mock_tool_context.state["task_status"] == "in_progress"
         assert mock_tool_context.state["task_name"] == "my_job"
 
-    def test_creates_background_task_with_session_ids(self, mock_tool_context):
+    def test_creates_background_task_with_session_ids(
+        self, mock_tool_context, mock_event_loop
+    ):
         """Should call loop.create_task passing session identifiers (not object)."""
-        mock_loop = MagicMock()
-        with patch("adk_agent.tools.asyncio.get_event_loop", return_value=mock_loop):
+        with patch(
+            "adk_agent.tools.asyncio.get_event_loop", return_value=mock_event_loop
+        ):
             submit_long_task("bg_test", 5, mock_tool_context)
 
-        mock_loop.create_task.assert_called_once()
+        mock_event_loop.create_task.assert_called_once()
 
-    def test_returns_dict_type(self, mock_tool_context):
+    def test_returns_dict_type(self, mock_tool_context, mock_event_loop):
         """Should return a dict (required by ADK tool contract)."""
-        with patch("adk_agent.tools.asyncio.get_event_loop") as mock_loop:
-            mock_loop.return_value = MagicMock()
-
+        with patch(
+            "adk_agent.tools.asyncio.get_event_loop", return_value=mock_event_loop
+        ):
             result = submit_long_task("type_check", 7, mock_tool_context)
 
         assert isinstance(result, dict)
         assert set(result.keys()) == {"status", "task_name", "duration", "message"}
 
-    def test_duration_in_message(self, mock_tool_context):
+    def test_duration_in_message(self, mock_tool_context, mock_event_loop):
         """Should include the custom duration in the response message."""
-        with patch("adk_agent.tools.asyncio.get_event_loop") as mock_loop:
-            mock_loop.return_value = MagicMock()
-
+        with patch(
+            "adk_agent.tools.asyncio.get_event_loop", return_value=mock_event_loop
+        ):
             result = submit_long_task("dur_test", 15, mock_tool_context)
 
         assert "15" in result["message"]
