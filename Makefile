@@ -24,7 +24,7 @@
         deploy docker-build docker-push deploy-run lint clean
 
 # Configuration
-PROJECT_ID ?= ikigai-dev-376122
+PROJECT_ID ?= hello-world-418507
 REGION ?= us-central1
 SERVICE_NAME ?= er-mcp-server
 IMAGE_NAME ?= gcr.io/$(PROJECT_ID)/$(SERVICE_NAME)
@@ -80,9 +80,9 @@ test-mcp:
 
 agent-web:
 	@echo "🌐 Starting ADK agent web UI..."
-	uv run adk web adk_agent
+	uv run adk web .
 
-agent-run chat:
+agent-chat:
 	@echo "🤖 Starting ADK agent CLI chat..."
 	@echo "Type your questions about Expert Requests. Press Ctrl+C to exit."
 	uv run adk run adk_agent
@@ -188,8 +188,7 @@ deploy-run:
 		--timeout 300
 
 test-cloud:
-	@echo "☁️  Testing Cloud Run MCP server..."
-	@echo "  URL: https://er-mcp-server-462396196470.$(REGION).run.app"
+	@echo "☁️  Testing Cloud Run MCP server (URL from adk_agent/.env)..."
 	uv run python tests/test_cloud_mcp.py
 
 # ============================================================

@@ -8,13 +8,19 @@ Run with: make test-cloud
 
 import asyncio
 import json
+import os
 import subprocess
 
+from dotenv import load_dotenv
 from mcp import ClientSession
 from mcp.client.sse import sse_client
 
-# Cloud Run service URL
-MCP_SERVER_URL = "https://er-mcp-server-462396196470.us-central1.run.app/sse"
+# Load MCP_SERVER_URL from adk_agent/.env (e.g. https://...run.app)
+load_dotenv("adk_agent/.env")
+_base_url = os.getenv("MCP_SERVER_URL")
+if not _base_url:
+    raise RuntimeError("MCP_SERVER_URL not set in adk_agent/.env")
+MCP_SERVER_URL = f"{_base_url.rstrip('/')}/sse"
 
 
 def _get_auth_headers() -> dict[str, str]:
