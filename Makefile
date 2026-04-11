@@ -20,7 +20,7 @@
 #   make deploy-adk-agent-engine    — Deploy ADK agent to Agent Engine
 #   make deploy-a2a-agent-engine    — Deploy A2A agent to Agent Engine
 #   make deploy-adk-gemini-enterprise — Register ENGINE_ID to Gemini Enterprise
-#   make test-adk-streamassist        — Test ADK agent on Gemini Enterprise
+#   make test-gemini-enterprise       — Test ADK agent on Gemini Enterprise
 #
 # A2A local dev:
 #   Terminal 1: make a2a-server
@@ -32,7 +32,7 @@
         agui-server agui-frontend agui-install \
         a2a-server test-a2a test-a2a-client-local \
         deploy-mcp-server-cloudrun deploy-adk-agent-engine deploy-a2a-agent-engine \
-        deploy-adk-gemini-enterprise test-adk-streamassist \
+        deploy-adk-gemini-enterprise test-gemini-enterprise \
         test-a2a-remote test-a2a-client-remote test-cloud
 
 # ---------- Configuration ----------
@@ -127,7 +127,7 @@ deploy-a2a-agent-engine:
 deploy-adk-gemini-enterprise:
 	bash ge_register.sh register
 
-test-adk-streamassist:
+test-gemini-enterprise:
 	uv run python ge_stream_assist_sharepoint.py
 
 # ---------- Utilities ----------
