@@ -77,7 +77,7 @@ def _build_orchestrator_with_remote_a2a(
     # Build the local orchestrator
     orchestrator = Agent(
         name="orchestrator_agent",
-        model="gemini-2.0-flash",
+        model="gemini-2.5-flash",
         instruction="""You are an orchestrator agent that helps users by
         delegating tasks to specialized sub-agents.
 

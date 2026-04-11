@@ -162,7 +162,7 @@ async def test_adk_agent_with_cloud_mcp():
     # Create agent pointing to Cloud Run MCP server
     cloud_agent = Agent(
         name="cloud_er_agent",
-        model="gemini-2.0-flash",
+        model="gemini-2.5-flash",
         instruction=(
             "You are an ER query assistant. Use search_er_by_email to find "
             "ERs by email and search_er_by_date to find ERs by date."

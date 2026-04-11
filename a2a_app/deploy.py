@@ -248,7 +248,7 @@ def _build_a2a_agent():
 
     llm_agent = Agent(
         name="er_query_agent",
-        model="gemini-2.0-flash",
+        model="gemini-2.5-flash",
         instruction=AGENT_INSTRUCTION,
         description=(
             "An agent that queries Expert Request data from Firestore "
