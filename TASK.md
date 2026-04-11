@@ -17,5 +17,5 @@
 - register agent engine as custom agent on gemini enterprise using as_register.sh
 - Use ge_stream_assist_sharepoint.py to streamassist API to test custom agent on gemini enterprise
 - Check that custom agent can be found here https://vertexaisearch.cloud.google.com/home/cid/a558f756-6409-47aa-a388-4ba6829f8291/r/agents under "From your organization" section. You may need to click "Show more"
-- Now click the agent, put in the query in the text box and click send button.
+- Now click the agent, put in the query in the text box and click send "kite" button.
 - Check there is response coming back.
