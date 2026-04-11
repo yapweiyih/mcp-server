@@ -44,7 +44,9 @@ PROJECT_ID = os.getenv("GOOGLE_CLOUD_PROJECT")
 LOCATION = os.getenv("GOOGLE_CLOUD_LOCATION", "us-central1")
 STAGING_BUCKET = os.getenv("STAGING_BUCKET", "gs://wei-test")
 ENV_VARS = {
-    "DISPLAY_NAME": DISPLAY_NAME,
+    "GOOGLE_GENAI_USE_VERTEXAI": "TRUE",
+    "COLLECTION": os.getenv("COLLECTION", "accounts"),
+    "DATABASE_ID": os.getenv("DATABASE_ID", "default"),
 }
 
 
@@ -188,11 +190,7 @@ def deploy_agent():
         agent_engine=app,
         requirements=REQUIREMENTS,
         extra_packages=EXTRA_PACKAGES,
-        env_vars={
-            "GOOGLE_GENAI_USE_VERTEXAI": "TRUE",
-            "COLLECTION": os.getenv("COLLECTION", "accounts"),
-            "DATABASE_ID": os.getenv("DATABASE_ID", "default"),
-        },
+        env_vars=ENV_VARS,
     )
     ENGINE_ID = remote_app.resource_name.split("/")[-1]
     print(f"Agent deployed. ENGINE_ID: {ENGINE_ID}")
