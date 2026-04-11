@@ -23,9 +23,17 @@
         test-a2a-remote test-a2a-client \
         deploy docker-build docker-push deploy-run lint clean
 
-# Configuration
+# Configuration — read from adk_agent/.env, with fallback defaults
+ifneq (,$(wildcard adk_agent/.env))
+  PROJECT_ID ?= $(shell grep '^GOOGLE_CLOUD_PROJECT=' adk_agent/.env | cut -d= -f2-)
+  REGION ?= $(shell grep '^GOOGLE_CLOUD_LOCATION=' adk_agent/.env | cut -d= -f2-)
+  DATABASE_ID ?= $(shell grep '^DATABASE_ID=' adk_agent/.env | cut -d= -f2-)
+  COLLECTION ?= $(shell grep '^COLLECTION=' adk_agent/.env | cut -d= -f2-)
+endif
 PROJECT_ID ?= hello-world-418507
 REGION ?= us-central1
+DATABASE_ID ?= ikigai-dev
+COLLECTION ?= expert_requests_dev
 SERVICE_NAME ?= er-mcp-server
 IMAGE_NAME ?= gcr.io/$(PROJECT_ID)/$(SERVICE_NAME)
 
@@ -182,7 +190,7 @@ deploy-run:
 		--project $(PROJECT_ID) \
 		--region $(REGION) \
 		--image $(IMAGE_NAME) \
-		--set-env-vars="MCP_TRANSPORT=sse,GOOGLE_CLOUD_PROJECT=$(PROJECT_ID),DATABASE_ID=ikigai-dev,COLLECTION=expert_requests_dev" \
+		--set-env-vars="MCP_TRANSPORT=sse,GOOGLE_CLOUD_PROJECT=$(PROJECT_ID),DATABASE_ID=$(DATABASE_ID),COLLECTION=$(COLLECTION)" \
 		--port 8080 \
 		--memory 512Mi \
 		--timeout 300
