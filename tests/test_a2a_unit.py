@@ -15,9 +15,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-pytestmark = pytest.mark.asyncio
-
-
 # ── Agent Card Tests ─────────────────────────────────────────────────
 
 
@@ -301,7 +298,7 @@ class TestOrchestratorConstruction:
 
         orchestrator = Agent(
             name="orchestrator",
-            model="gemini-2.0-flash",
+            model="gemini-2.5-flash",
             instruction="Delegate ER queries to remote_er.",
             description="Orchestrator",
             sub_agents=[remote],

@@ -351,8 +351,8 @@ async def test_with_http(
 @click.option(
     "--resource-id",
     type=str,
-    required=True,
-    help="Agent Engine resource ID (from deployment output)",
+    default=None,
+    help="Agent Engine resource ID (default: A2A_ENGINE_ID from .env)",
 )
 @click.option(
     "--project-id",
@@ -386,6 +386,12 @@ def test_remote_a2a(
     message: str,
 ) -> None:
     """Test the deployed A2A agent on Agent Engine."""
+
+    resource_id = resource_id or os.getenv("A2A_ENGINE_ID")
+    if not resource_id:
+        raise click.UsageError(
+            "Missing --resource-id. Set A2A_ENGINE_ID in adk_agent/.env or pass --resource-id."
+        )
 
     project_id = project_id or os.getenv("GOOGLE_CLOUD_PROJECT", "ikigai-dev-376122")
     location = location or os.getenv("GOOGLE_CLOUD_LOCATION", "us-central1")

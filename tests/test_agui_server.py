@@ -9,7 +9,6 @@ import pytest
 from unittest.mock import patch, MagicMock, AsyncMock
 from fastapi.testclient import TestClient
 
-
 # ──────────────────────────────────────────────────────────────
 # Fixtures
 # ──────────────────────────────────────────────────────────────
@@ -104,13 +103,13 @@ class TestADKAgentSetup:
     """Tests for ADK agent construction and AG-UI wrapping."""
 
     def test_adk_agent_created_with_correct_model(self, mock_dependencies):
-        """The ADK Agent should be configured with gemini-2.0-flash."""
+        """The ADK Agent should be configured with gemini-2.5-flash."""
         from agui_server import create_adk_agent
 
         agent = create_adk_agent()
         # Agent constructor is called — check name and model
         assert agent.name == "er_query_agent"
-        assert agent.model == "gemini-2.0-flash"
+        assert agent.model == "gemini-2.5-flash"
 
     def test_adk_agent_includes_custom_tools(self, mock_dependencies):
         """Agent should include submit_long_task and check_task_status."""

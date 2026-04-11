@@ -119,7 +119,7 @@ def create_adk_agent() -> Agent:
     """
     return Agent(
         name="er_query_agent",
-        model="gemini-2.0-flash",
+        model="gemini-2.5-flash",
         instruction=AGENT_INSTRUCTION,
         description=(
             "An agent that queries Expert Request data from Firestore "
