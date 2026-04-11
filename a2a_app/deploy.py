@@ -243,8 +243,8 @@ def _build_a2a_agent():
                 )
 
     # ── 3. LLM Agent (reuse existing tools) ──────────────────────────
-    # Import MCP toolset builder from the existing agent module
-    from adk_agent.agent import _get_mcp_toolset
+    # _get_tools() returns the full tool list (MCP or direct + long-running)
+    from adk_agent.agent import _get_tools
 
     llm_agent = Agent(
         name="er_query_agent",
@@ -254,11 +254,7 @@ def _build_a2a_agent():
             "An agent that queries Expert Request data from Firestore "
             "and runs background tasks"
         ),
-        tools=[
-            _get_mcp_toolset(),
-            submit_long_task,
-            check_task_status,
-        ],
+        tools=_get_tools(),
         before_agent_callback=check_pending_tasks_callback,
     )
 
