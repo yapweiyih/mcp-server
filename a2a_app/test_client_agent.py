@@ -138,6 +138,7 @@ async def run_orchestrator(
     click.echo()
 
     final_text = ""
+    last_agent_text = ""
     async for event in runner.run_async(
         user_id="test_user",
         session_id=session.id,
@@ -146,19 +147,34 @@ async def run_orchestrator(
             parts=[types.Part.from_text(text=message)],
         ),
     ):
-        # Log intermediate events
-        if event.content and event.content.parts:
-            author = event.author or "unknown"
-            for part in event.content.parts:
-                if hasattr(part, "text") and part.text:
-                    click.echo(f"  [{author}] {part.text[:200]}")
+        if not event.content or not event.content.parts:
+            continue
 
-        if event.is_final_response() and event.content and event.content.parts:
-            final_text = "".join(
-                p.text for p in event.content.parts if hasattr(p, "text") and p.text
-            )
+        author = event.author or "unknown"
+        for part in event.content.parts:
+            if hasattr(part, "text") and part.text:
+                click.echo(f"  [{author}] {part.text[:200]}")
+            elif hasattr(part, "function_call") and part.function_call:
+                click.echo(f"  [{author}] → calling {part.function_call.name}")
+            elif hasattr(part, "function_response") and part.function_response:
+                click.echo(
+                    f"  [{author}] ← response from {part.function_response.name}"
+                )
 
-    return final_text
+        # Extract text from this event
+        text = "".join(
+            p.text for p in event.content.parts if hasattr(p, "text") and p.text
+        )
+
+        if text:
+            last_agent_text = text
+
+        if event.is_final_response() and text:
+            final_text = text
+
+    # Fall back to the last text we saw from any agent if is_final_response
+    # didn't produce text (common with remote A2A delegation patterns).
+    return final_text or last_agent_text
 
 
 def _get_agent_card_url_from_resource(
