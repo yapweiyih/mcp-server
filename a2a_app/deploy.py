@@ -40,6 +40,45 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+def _update_env_file(engine_id: str) -> None:
+    """Write the deployed A2A engine resource ID into adk_agent/.env.
+
+    Adds or updates the A2A_ENGINE_ID entry so other scripts (e.g.
+    test_remote.py) can read it without passing --resource-id manually.
+
+    Args:
+        engine_id: The Agent Engine resource ID returned after deployment.
+
+    Returns:
+        None. Modifies adk_agent/.env in-place.
+    """
+    env_path = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "..", "adk_agent", ".env"
+    )
+    env_path = os.path.normpath(env_path)
+
+    if not os.path.exists(env_path):
+        click.echo(f"⚠️  .env file not found at {env_path}, skipping update.")
+        return
+
+    lines = []
+    updated = False
+    with open(env_path, "r") as f:
+        for line in f:
+            if line.startswith("A2A_ENGINE_ID="):
+                lines.append(f"A2A_ENGINE_ID={engine_id}\n")
+                updated = True
+            else:
+                lines.append(line)
+
+    if not updated:
+        lines.append(f"A2A_ENGINE_ID={engine_id}\n")
+
+    with open(env_path, "w") as f:
+        f.writelines(lines)
+    click.echo(f"📝 Updated .env with A2A_ENGINE_ID={engine_id}")
+
+
 def _build_a2a_agent():
     """Build the A2aAgent instance for deployment to Agent Engine.
 
@@ -427,6 +466,8 @@ def deploy_agent_engine(
 
     resource_name = remote_agent.api_resource.name
     resource_id = resource_name.split("/")[-1]
+
+    _update_env_file(resource_id)
 
     click.echo("\n✅ Deployment successful!")
     click.echo(f"\n📋 Deployment Info:")
