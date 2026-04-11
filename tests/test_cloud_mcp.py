@@ -56,7 +56,7 @@ async def test_tools_list():
 
 
 async def test_search_by_email():
-    """Test search_er_by_email returns a valid JSON list from Firestore."""
+    """Test search_er_by_email returns expected ERs from Firestore."""
     test_email = os.getenv("TEST_CE_EMAIL", "issein@google.com")
     print(f"\n📧 Test: search_er_by_email('{test_email}')")
 
@@ -81,13 +81,14 @@ async def test_search_by_email():
                     f"   - {r['er_name']}: {r['account_name']} ({r['account_sub_region']})"
                 )
 
-            if not records:
-                print(f"   ⚠️  No ERs found for {test_email} (data may have changed)")
+            assert len(records) >= 1, f"Expected at least 1 ER for {test_email}"
+            er_names = {r["er_name"] for r in records}
+            assert "ER-431059" in er_names, "Expected ER-431059 in results"
             print("   ✅ Email query returned valid response")
 
 
 async def test_search_by_date():
-    """Test search_er_by_date returns a valid JSON list from Firestore."""
+    """Test search_er_by_date returns expected ERs from Firestore."""
     print("\n📅 Test: search_er_by_date(year=2024, month=4)")
 
     headers = _get_auth_headers()
@@ -108,8 +109,9 @@ async def test_search_by_date():
             for r in records[:5]:
                 print(f"   - {r['er_name']}: {r['account_name']}")
 
-            if not records:
-                print("   ⚠️  No ERs found for April 2024 (data may have changed)")
+            assert len(records) >= 1, "Expected at least 1 ER for April 2024"
+            er_names = {r["er_name"] for r in records}
+            assert "ER-263385" in er_names, "Expected ER-263385 in results"
             print("   ✅ Date query returned valid response")
 
 
