@@ -32,7 +32,7 @@
         agui-server agui-frontend agui-install \
         a2a-server test-a2a test-a2a-client-local \
         deploy-mcp-server-cloudrun deploy-adk-agent-engine deploy-a2a-agent-engine \
-        deploy-adk-gemini-enterprise test-gemini-enterprise \
+        deploy-adk-gemini-enterprise delete-gemini-enterprise test-gemini-enterprise \
         test-a2a-remote test-a2a-client-remote test-cloud
 
 # ---------- Configuration ----------
@@ -126,6 +126,9 @@ deploy-a2a-agent-engine:
 
 deploy-adk-gemini-enterprise:
 	bash ge_register.sh register
+
+delete-gemini-enterprise:
+	bash ge_delete_agent.sh
 
 test-gemini-enterprise:
 	uv run python ge_stream_assist_sharepoint.py
