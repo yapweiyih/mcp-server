@@ -67,8 +67,7 @@ def _build_orchestrator_with_remote_a2a(
     kwargs = {}
     if not isinstance(agent_card, str):
         import httpx
-        from a2a.client import A2AClientConfig as ClientConfig
-        from a2a.client import A2AClientFactory as ClientFactory
+        from a2a.client import ClientConfig, ClientFactory
         from a2a.types import TransportProtocol
         from google.auth import default
         from google.auth.transport.requests import Request
