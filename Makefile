@@ -122,7 +122,7 @@ deploy-adk-agent-engine:
 deploy-a2a-agent-engine:
 	uv run python -m a2a_app.deploy
 
-ge-register:
+deploy-adk-gemini-enterprise:
 	bash ge_register.sh register
 
 # ---------- Utilities ----------
