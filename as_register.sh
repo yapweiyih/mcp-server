@@ -6,11 +6,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 echo
 # echo "########################################################"
-if [ -f "${SCRIPT_DIR}/.env" ]; then
-  source "${SCRIPT_DIR}/.env"
-  echo "Loaded environment variables from .env file"
+if [ -f "${SCRIPT_DIR}/adk_agent/.env" ]; then
+  source "${SCRIPT_DIR}/adk_agent/.env"
+  echo "Loaded environment variables from adk_agent/.env file"
 else
-  echo "Warning: .env file not found in ${SCRIPT_DIR}"
+  echo "Warning: .env file not found in ${SCRIPT_DIR}/adk_agent/"
 fi
 
 echo "     GOOGLE_CLOUD_PROJECT: ${GOOGLE_CLOUD_PROJECT}"

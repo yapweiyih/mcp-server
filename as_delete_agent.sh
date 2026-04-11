@@ -1,6 +1,6 @@
 #! /bin/env bash
 
-source .env
+source adk_agent/.env
 
 # Delete existing ADK Agent with the same DISPLAY NAME if any
 OLD_AGENT_ID=$(bash as_register.sh list ${DISPLAY_NAME} | grep "name" | grep -o '/agents/[0-9]*' | cut -d'/' -f3)

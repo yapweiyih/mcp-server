@@ -317,8 +317,11 @@ class AgentSpaceClient:
 
 
 if __name__ == "__main__":
-    # Load configuration from environment variables (.env file)
-    load_dotenv()
+    # Load configuration from adk_agent/.env file
+    _env_path = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "adk_agent", ".env"
+    )
+    load_dotenv(_env_path)
 
     # Configuration OVERRIDES (Set these values to override .env variables for testing)
     OVERRIDE_PROJECT_ID = None
@@ -331,7 +334,7 @@ if __name__ == "__main__":
     project_id = (
         OVERRIDE_PROJECT_ID
         if OVERRIDE_PROJECT_ID is not None
-        else os.getenv("PROJECT_ID")
+        else os.getenv("PROJECT_ID", os.getenv("GOOGLE_CLOUD_PROJECT"))
     )
     app_id = OVERRIDE_APP_ID if OVERRIDE_APP_ID is not None else os.getenv("APP_ID")
     agent_id = (

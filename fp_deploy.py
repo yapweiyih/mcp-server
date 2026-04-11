@@ -4,11 +4,12 @@ import logging
 import os
 import sys
 import tomllib
+
 import vertexai.agent_engines
 
-# Load .env file manually from fairprice/.env
+# Load .env file manually from adk_agent/.env
 _env_path = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), "fairprice", ".env"
+    os.path.dirname(os.path.abspath(__file__)), "adk_agent", ".env"
 )
 if os.path.exists(_env_path):
     with open(_env_path, "r") as f:
@@ -38,17 +39,11 @@ STEPS = [
     "Test deployed agent on cloud (sync)",
 ]
 
-DISPLAY_NAME = os.getenv("DISPLAY_NAME", "p1-demo-20250725")
-PROJECT_ID = os.getenv("GOOGLE_CLOUD_PROJECT", "vital-octagon-19612")
-LOCATION = "us-central1"
-STAGING_BUCKET = os.getenv("STAGING_BUCKET", "gs://vital-wy")
-BQ_DATASET = "agent_fin"
-BQ_REGION = os.getenv("BQ_REGION", "us")
-USER_GROUPING = "weiyih"
+DISPLAY_NAME = os.getenv("DISPLAY_NAME", "GE Asset - MCP Server Agent")
+PROJECT_ID = os.getenv("GOOGLE_CLOUD_PROJECT")
+LOCATION = os.getenv("GOOGLE_CLOUD_LOCATION", "us-central1")
+STAGING_BUCKET = os.getenv("STAGING_BUCKET", "gs://wei-test")
 ENV_VARS = {
-    "BQ_DATASET": BQ_DATASET,
-    "BQ_REGION": BQ_REGION,
-    "USER_GROUPING": USER_GROUPING,
     "DISPLAY_NAME": DISPLAY_NAME,
 }
 
@@ -61,7 +56,7 @@ def load_requirements_from_pyproject() -> list[str]:
         list[str]: A list of dependency strings.
     """
     _pyproject_path = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+        os.path.dirname(os.path.abspath(__file__)),
         "pyproject.toml",
     )
     if not os.path.exists(_pyproject_path):
@@ -79,7 +74,7 @@ def load_requirements_from_pyproject() -> list[str]:
         return []
 
 
-EXTRA_PACKAGES = ["./fairprice"]
+EXTRA_PACKAGES = ["./adk_agent"]
 REQUIREMENTS = load_requirements_from_pyproject()
 logging.getLogger("google").setLevel(logging.ERROR)
 
@@ -109,9 +104,8 @@ def set_env_and_logging():
     print(f"PROJECT_ID: {PROJECT_ID}")
     print(f"LOCATION: {LOCATION}")
     print(f"STAGING_BUCKET: {STAGING_BUCKET}")
-    print(f"BQ_DATASET: {BQ_DATASET}")
-    print(f"BQ_REGION: {BQ_REGION}")
-    print(f"USER_GROUPING: {USER_GROUPING}")
+    print(f"COLLECTION: {os.getenv('COLLECTION', 'expert_requests_dev')}")
+    print(f"DATABASE_ID: {os.getenv('DATABASE_ID', 'ikigai-dev')}")
     print("-------------------------------\n")
 
     confirm = input("Confirm these settings? Proceed? [y/N]: ")
@@ -121,9 +115,6 @@ def set_env_and_logging():
 
     os.environ["GOOGLE_CLOUD_PROJECT"] = PROJECT_ID
     os.environ["GOOGLE_CLOUD_LOCATION"] = LOCATION
-    os.environ["BQ_DATASET"] = BQ_DATASET
-    os.environ["BQ_REGION"] = BQ_REGION
-    os.environ["USER_GROUPING"] = USER_GROUPING
     os.environ["GOOGLE_GENAI_USE_VERTEXAI"] = "TRUE"  # Use Vertex AI API
     print("Environment variables set.")
 
@@ -139,8 +130,9 @@ def init_vertexai():
 
 
 def import_agent():
-    from fairprice.agent import root_agent
     from vertexai import agent_engines
+
+    from adk_agent.agent import root_agent
 
     return agent_engines, root_agent
 
@@ -154,7 +146,7 @@ async def local_test():
         enable_tracing=True,
     )
     session = await app.async_create_session(user_id="u_123")
-    PROMPT = "What is the sales performance for Grocery Brick & Mortar on 20 Jun 2025 vs. Budget?"
+    PROMPT = "What expert requests are assigned to weiyih@google.com?"
     print("Local test session created.")
     async for event in app.async_stream_query(
         user_id="u_123",
@@ -198,9 +190,8 @@ def deploy_agent():
         extra_packages=EXTRA_PACKAGES,
         env_vars={
             "GOOGLE_GENAI_USE_VERTEXAI": "TRUE",
-            "BQ_REGION": BQ_REGION,
-            "BQ_DATASET": BQ_DATASET,
-            "USER_GROUPING": USER_GROUPING,
+            "COLLECTION": os.getenv("COLLECTION", "accounts"),
+            "DATABASE_ID": os.getenv("DATABASE_ID", "default"),
         },
     )
     ENGINE_ID = remote_app.resource_name.split("/")[-1]
@@ -216,9 +207,7 @@ async def test_on_cloud(engine_id):
     )
     session = await adk_app.async_create_session(user_id="u_123")
     print(f"Cloud test session created: {session}")
-    for PROMPT in [
-        "What is the sales performance for Grocery Brick & Mortar vs. Budget, for 20 jun 2025??"
-    ]:
+    for PROMPT in ["What expert requests are assigned to weiyih@google.com?"]:
         print(f"\nPrompt: {PROMPT}")
         async for event in adk_app.async_stream_query(
             user_id="u_123",
@@ -261,7 +250,7 @@ def update_env_file(engine_id: str) -> None:
          None. Modifies the file in-place.
     """
     _env_path = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)), "fairprice", ".env"
+        os.path.dirname(os.path.abspath(__file__)), "adk_agent", ".env"
     )
     if not os.path.exists(_env_path):
         print(f".env file not found at {_env_path}, skipping update.")

@@ -10,6 +10,7 @@
 - **Honesty:** You are an AI. Do not claim to have feelings, but act with high competence and logical reasoning.
 
 # Main Tasks
+- update as_register.sh and fp_deploy.py to work in this repo
 - ensure all import relative path is correct, any other things that is not correct
 - You must ensure adk_agent is deployed to agent engine successfully, the deployment can take 5mins ( fp_deploy.py)
 - you must ensure all local test, deployment, cloud test for agent engine are correct

@@ -17,16 +17,11 @@ Why MCP over direct function calls?
     pattern for production agent architectures.
 """
 
+import json
 import os
 import sys
 
 from google.adk.agents import Agent
-from google.adk.tools.mcp_tool import McpToolset
-from google.adk.tools.mcp_tool.mcp_session_manager import (
-    SseConnectionParams,
-    StdioConnectionParams,
-)
-from mcp import StdioServerParameters
 
 from adk_agent.tools import (
     check_pending_tasks_callback,
@@ -88,46 +83,96 @@ Guidelines:
 """
 
 
-def _get_mcp_toolset() -> McpToolset:
-    """Create the appropriate MCP toolset based on environment config.
+def search_er_by_email(assigned_ce_email: str) -> str:
+    """Search Expert Requests by the assigned Customer Engineer's email.
+
+    Args:
+        assigned_ce_email: The email address of the assigned Customer
+            Engineer (e.g., 'weiyih@google.com').
 
     Returns:
-        McpToolset configured for either stdio (local) or SSE (remote)
-        connection to the ER Query MCP server.
+        A JSON string containing matching ER records with er_name,
+        account_name, account_sub_region, assigned_ce_email, and details.
+        Returns '[]' if no matching ERs are found.
+    """
+    from er_query.client import query_er_by_email as _query
+
+    results = _query(assigned_ce_email)
+    return json.dumps(results, indent=2, ensure_ascii=False)
+
+
+def search_er_by_date(year: int, month: int | None = None) -> str:
+    """Search Expert Requests by creation date (year or year+month).
+
+    Args:
+        year: The year to filter by (e.g., 2024 or 2025).
+        month: Optional month to filter by (1-12).
+
+    Returns:
+        A JSON string containing matching ER records.
+        Returns '[]' if no matching ERs are found.
+    """
+    from er_query.client import query_er_by_date as _query
+
+    results = _query(year=year, month=month)
+    return json.dumps(results, indent=2, ensure_ascii=False)
+
+
+def get_er_fields(er_name: str, fields: str | None = None) -> str:
+    """Get specific fields from an Expert Request by its ER name.
+
+    Args:
+        er_name: The ER identifier (e.g., 'ER-431059').
+        fields: Optional comma-separated field names (e.g., 'fsa_status,product').
+
+    Returns:
+        A JSON string with the requested fields. Returns '[]' if not found.
+    """
+    from er_query.client import query_er_by_name as _query
+
+    results = _query(er_name=er_name, fields=fields)
+    return json.dumps(results, indent=2, ensure_ascii=False, default=str)
+
+
+def _get_tools() -> list:
+    """Get the appropriate tools based on environment config.
+
+    Uses MCP toolset if MCP_SERVER_URL is set (remote SSE mode),
+    otherwise uses direct function tools (better for Agent Engine deployment
+    since they can be pickled).
+
+    Returns:
+        List of tools for the agent.
     """
     mcp_server_url = os.getenv("MCP_SERVER_URL")
 
     if mcp_server_url:
         # Remote MCP server (Cloud Run deployment)
-        return McpToolset(
-            connection_params=SseConnectionParams(url=mcp_server_url),
-        )
+        from google.adk.tools.mcp_tool import McpToolset
+        from google.adk.tools.mcp_tool.mcp_session_manager import SseConnectionParams
+
+        return [
+            McpToolset(connection_params=SseConnectionParams(url=mcp_server_url)),
+            submit_long_task,
+            check_task_status,
+        ]
     else:
-        # Local MCP server via stdio subprocess
-        return McpToolset(
-            connection_params=StdioConnectionParams(
-                server_params=StdioServerParameters(
-                    command=sys.executable,
-                    args=["-m", "mcp_server"],
-                    env={
-                        **os.environ,
-                        "PYTHONPATH": os.getcwd(),
-                    },
-                ),
-            ),
-        )
+        # Direct function tools (picklable for Agent Engine deployment)
+        return [
+            search_er_by_email,
+            search_er_by_date,
+            get_er_fields,
+            submit_long_task,
+            check_task_status,
+        ]
 
 
 # Define the root agent
 root_agent = Agent(
     name="er_query_agent",
-    model="gemini-2.0-flash",
+    model="gemini-2.5-flash",
     instruction=AGENT_INSTRUCTION,
     description="An agent that queries Expert Request data from Firestore and runs background tasks",
-    tools=[
-        _get_mcp_toolset(),
-        submit_long_task,
-        check_task_status,
-    ],
+    tools=_get_tools(),
     before_agent_callback=check_pending_tasks_callback,
 )
