@@ -1,7 +1,7 @@
 """End-to-end test for the Cloud Run MCP server.
 
-Tests the deployed MCP server by connecting via SSE and calling
-each tool with real parameters. Verifies actual data is returned.
+Tests the deployed MCP server by connecting via Streamable HTTP and
+calling each tool with real parameters. Verifies actual data is returned.
 
 Run with: make test-cloud
 """
@@ -13,14 +13,14 @@ import subprocess
 
 from dotenv import load_dotenv
 from mcp import ClientSession
-from mcp.client.sse import sse_client
+from mcp.client.streamable_http import streamablehttp_client
 
 # Load MCP_SERVER_URL from adk_agent/.env (e.g. https://...run.app)
 load_dotenv("adk_agent/.env")
 _base_url = os.getenv("MCP_SERVER_URL")
 if not _base_url:
     raise RuntimeError("MCP_SERVER_URL not set in adk_agent/.env")
-MCP_SERVER_URL = f"{_base_url.rstrip('/')}/sse"
+MCP_SERVER_URL = f"{_base_url.rstrip('/')}/mcp"
 
 
 def _get_auth_headers() -> dict[str, str]:
@@ -41,7 +41,11 @@ async def test_tools_list():
     print("\n📋 Test: tools/list")
 
     headers = _get_auth_headers()
-    async with sse_client(MCP_SERVER_URL, headers=headers) as (read, write):
+    async with streamablehttp_client(MCP_SERVER_URL, headers=headers) as (
+        read,
+        write,
+        _,
+    ):
         async with ClientSession(read, write) as session:
             await session.initialize()
 
@@ -61,7 +65,11 @@ async def test_search_by_email():
     print(f"\n📧 Test: search_er_by_email('{test_email}')")
 
     headers = _get_auth_headers()
-    async with sse_client(MCP_SERVER_URL, headers=headers) as (read, write):
+    async with streamablehttp_client(MCP_SERVER_URL, headers=headers) as (
+        read,
+        write,
+        _,
+    ):
         async with ClientSession(read, write) as session:
             await session.initialize()
 
@@ -92,7 +100,11 @@ async def test_search_by_date():
     print("\n📅 Test: search_er_by_date(year=2024, month=4)")
 
     headers = _get_auth_headers()
-    async with sse_client(MCP_SERVER_URL, headers=headers) as (read, write):
+    async with streamablehttp_client(MCP_SERVER_URL, headers=headers) as (
+        read,
+        write,
+        _,
+    ):
         async with ClientSession(read, write) as session:
             await session.initialize()
 
@@ -120,7 +132,11 @@ async def test_search_by_email_no_results():
     print("\n📧 Test: search_er_by_email('nonexistent@google.com')")
 
     headers = _get_auth_headers()
-    async with sse_client(MCP_SERVER_URL, headers=headers) as (read, write):
+    async with streamablehttp_client(MCP_SERVER_URL, headers=headers) as (
+        read,
+        write,
+        _,
+    ):
         async with ClientSession(read, write) as session:
             await session.initialize()
 
@@ -138,7 +154,7 @@ async def test_search_by_email_no_results():
 
 
 async def test_adk_agent_with_cloud_mcp():
-    """Test ADK agent using the Cloud Run MCP server via SSE.
+    """Test ADK agent using the Cloud Run MCP server via Streamable HTTP.
 
     Creates an agent that connects to the deployed MCP server and
     verifies it can answer natural language queries using the remote tools.
@@ -150,16 +166,16 @@ async def test_adk_agent_with_cloud_mcp():
     from google.adk.runners import Runner
     from google.adk.sessions import InMemorySessionService
     from google.adk.tools.mcp_tool import McpToolset
-    from google.adk.tools.mcp_tool.mcp_session_manager import SseConnectionParams
+    from google.adk.tools.mcp_tool.mcp_session_manager import (
+        StreamableHTTPConnectionParams,
+    )
     from google.genai import types
 
     # Load Vertex AI config
     load_dotenv("adk_agent/.env")
 
-    CLOUD_MCP_URL = MCP_SERVER_URL.replace("/sse", "")
-
     print("\n🤖 Test: ADK Agent with Cloud Run MCP Server")
-    print(f"   MCP URL: {CLOUD_MCP_URL}/sse")
+    print(f"   MCP URL: {MCP_SERVER_URL}")
 
     # Create agent pointing to Cloud Run MCP server
     cloud_agent = Agent(
@@ -171,8 +187,8 @@ async def test_adk_agent_with_cloud_mcp():
         ),
         tools=[
             McpToolset(
-                connection_params=SseConnectionParams(
-                    url=f"{CLOUD_MCP_URL}/sse",
+                connection_params=StreamableHTTPConnectionParams(
+                    url=MCP_SERVER_URL,
                     headers=_get_auth_headers(),
                 ),
             )
