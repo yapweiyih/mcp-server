@@ -11,6 +11,7 @@ import json
 import os
 import subprocess
 
+import httpx
 from dotenv import load_dotenv
 from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
@@ -41,7 +42,9 @@ async def test_tools_list():
     print("\n📋 Test: tools/list")
 
     headers = _get_auth_headers()
-    async with streamable_http_client(MCP_SERVER_URL, headers=headers) as (
+    async with streamable_http_client(
+        MCP_SERVER_URL, http_client=httpx.AsyncClient(headers=headers)
+    ) as (
         read,
         write,
         _,
@@ -65,7 +68,9 @@ async def test_search_by_email():
     print(f"\n📧 Test: search_er_by_email('{test_email}')")
 
     headers = _get_auth_headers()
-    async with streamable_http_client(MCP_SERVER_URL, headers=headers) as (
+    async with streamable_http_client(
+        MCP_SERVER_URL, http_client=httpx.AsyncClient(headers=headers)
+    ) as (
         read,
         write,
         _,
@@ -100,7 +105,9 @@ async def test_search_by_date():
     print("\n📅 Test: search_er_by_date(year=2024, month=4)")
 
     headers = _get_auth_headers()
-    async with streamable_http_client(MCP_SERVER_URL, headers=headers) as (
+    async with streamable_http_client(
+        MCP_SERVER_URL, http_client=httpx.AsyncClient(headers=headers)
+    ) as (
         read,
         write,
         _,
@@ -132,7 +139,9 @@ async def test_search_by_email_no_results():
     print("\n📧 Test: search_er_by_email('nonexistent@google.com')")
 
     headers = _get_auth_headers()
-    async with streamable_http_client(MCP_SERVER_URL, headers=headers) as (
+    async with streamable_http_client(
+        MCP_SERVER_URL, http_client=httpx.AsyncClient(headers=headers)
+    ) as (
         read,
         write,
         _,
