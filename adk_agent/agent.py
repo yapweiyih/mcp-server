@@ -7,14 +7,16 @@ connection modes:
 1. **stdio** (default/local): Spawns the MCP server as a subprocess
    and communicates via stdin/stdout. Best for local development.
 
-2. **SSE** (remote/Cloud Run): Connects to a deployed MCP server
-   via HTTP SSE. Set MCP_SERVER_URL env var to the Cloud Run URL.
+2. **Streamable HTTP** (remote/Cloud Run): Connects to a deployed MCP
+   server via HTTP. Set MCP_SERVER_URL env var to the Cloud Run URL.
+   Uses the /mcp endpoint (Streamable HTTP transport), which is
+   required by Gemini Enterprise / Agentspace.
 
 Why MCP over direct function calls?
     Using MCP decouples the agent from the data layer. The same MCP
-    server can serve multiple clients (ADK agents, Claude, VSCode, etc.)
-    and can be deployed/scaled independently. This is the recommended
-    pattern for production agent architectures.
+    server can serve multiple clients (ADK agents, Claude, Gemini
+    Enterprise, VSCode, etc.) and can be deployed/scaled independently.
+    This is the recommended pattern for production agent architectures.
 """
 
 import json
@@ -172,7 +174,7 @@ def _get_identity_token(audience: str) -> str | None:
 def _get_tools() -> list:
     """Get the appropriate tools based on environment config.
 
-    Uses MCP toolset if MCP_SERVER_URL is set (remote SSE mode),
+    Uses MCP toolset if MCP_SERVER_URL is set (remote Streamable HTTP mode),
     otherwise uses direct function tools (better for Agent Engine deployment
     since they can be pickled).
 
@@ -182,14 +184,16 @@ def _get_tools() -> list:
     mcp_server_url = os.getenv("MCP_SERVER_URL")
 
     if mcp_server_url:
-        # Remote MCP server (Cloud Run deployment)
+        # Remote MCP server (Cloud Run deployment via Streamable HTTP)
         from google.adk.tools.mcp_tool import McpToolset
-        from google.adk.tools.mcp_tool.mcp_session_manager import SseConnectionParams
+        from google.adk.tools.mcp_tool.mcp_session_manager import (
+            StreamableHTTPConnectionParams,
+        )
 
-        # Ensure URL ends with /sse (MCP SSE endpoint path)
-        sse_url = mcp_server_url.rstrip("/")
-        if not sse_url.endswith("/sse"):
-            sse_url = f"{sse_url}/sse"
+        # Ensure URL ends with /mcp (Streamable HTTP endpoint path)
+        mcp_url = mcp_server_url.rstrip("/")
+        if not mcp_url.endswith("/mcp"):
+            mcp_url = f"{mcp_url}/mcp"
 
         # Cloud Run requires an identity token for authenticated services
         headers = {}
@@ -199,8 +203,8 @@ def _get_tools() -> list:
 
         return [
             McpToolset(
-                connection_params=SseConnectionParams(
-                    url=sse_url,
+                connection_params=StreamableHTTPConnectionParams(
+                    url=mcp_url,
                     headers=headers,
                 )
             ),

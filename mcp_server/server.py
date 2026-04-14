@@ -2,17 +2,25 @@
 
 This server wraps the Firestore query functions as MCP tools so they
 can be consumed by any MCP-compatible client (e.g., ADK agents, Claude,
-or other LLM orchestrators).
+Gemini Enterprise, or other LLM orchestrators).
 
 Why FastMCP?
     FastMCP (from the `mcp` package) provides a clean, decorator-based
     API for defining MCP tools. It handles JSON schema generation,
-    input validation, and the stdio/SSE transport layer automatically.
+    input validation, and the transport layer automatically.
     This is the recommended approach per the MCP specification.
 
+Transport options:
+    - stdio (default): For local development and testing
+    - streamable-http: For Cloud Run deployment and Gemini Enterprise
+      integration. Uses the /mcp endpoint path.
+    - sse (legacy): Server-Sent Events transport. Uses /sse endpoint.
+      Not supported by Gemini Enterprise / Agentspace.
+
 Usage:
-    Local stdio mode:  uv run python -m mcp_server.server
-    SSE mode (Cloud Run): Set MCP_TRANSPORT=sse and PORT env vars
+    Local stdio mode:       uv run python -m mcp_server.server
+    Streamable HTTP mode:   MCP_TRANSPORT=streamable-http PORT=8080 uv run python -m mcp_server
+    SSE mode (legacy):      MCP_TRANSPORT=sse PORT=8080 uv run python -m mcp_server
 """
 
 import json
@@ -140,9 +148,11 @@ def get_er_fields(er_name: str, fields: str | None = None) -> str:
 def main():
     """Run the MCP server.
 
-    Supports two transport modes:
+    Supports three transport modes (set via MCP_TRANSPORT env var):
     - stdio (default): For local development and testing
-    - sse: For Cloud Run deployment (set MCP_TRANSPORT=sse)
+    - streamable-http: For Cloud Run deployment and Gemini Enterprise.
+      Exposes a single /mcp endpoint.
+    - sse (legacy): SSE transport. Not supported by Gemini Enterprise.
     """
     transport = os.getenv("MCP_TRANSPORT", "stdio")
     mcp.run(transport=transport)

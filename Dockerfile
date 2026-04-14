@@ -1,10 +1,11 @@
 # Dockerfile for deploying the MCP server to Cloud Run
 #
-# The MCP server runs in SSE transport mode on Cloud Run, allowing
-# remote MCP clients (ADK agents, etc.) to connect over HTTP.
+# The MCP server runs in Streamable HTTP transport mode on Cloud Run,
+# allowing remote MCP clients (ADK agents, Gemini Enterprise, etc.)
+# to connect over HTTP via the /mcp endpoint.
 #
 # Build: docker build -t er-mcp-server .
-# Run locally: docker run -p 8080:8080 -e MCP_TRANSPORT=sse er-mcp-server
+# Run locally: docker run -p 8080:8080 er-mcp-server
 
 FROM python:3.12-slim
 
@@ -23,7 +24,7 @@ COPY mcp_server/ mcp_server/
 
 # Cloud Run sets PORT env var (default 8080)
 ENV PORT=8080
-ENV MCP_TRANSPORT=sse
+ENV MCP_TRANSPORT=streamable-http
 ENV PYTHONPATH=/app
 
 # Run the MCP server

@@ -9,7 +9,7 @@
 #   make clean      — Remove build artifacts
 #
 # Run locally:
-#   make mcp-sse        — MCP server (SSE, port 8080)
+#   make mcp-http       — MCP server (Streamable HTTP, port 8080)
 #   make agent-web      — ADK agent web UI
 #   make agent-chat     — ADK agent CLI
 #   make agui-server    — AG-UI backend (port 8000)
@@ -27,7 +27,7 @@
 #   Terminal 2: make test-a2a-client-local
 
 .PHONY: install test test-all lint format clean \
-        mcp-sse test-mcp \
+        mcp-http mcp-sse test-mcp \
         agent-web agent-chat \
         agui-server agui-frontend agui-install \
         a2a-server test-a2a test-a2a-client-local \
@@ -63,7 +63,7 @@ test-all:
 	uv run pytest -v -s
 
 test-mcp:
-	uv run python tests/test_mcp_sse.py
+	uv run python tests/test_mcp_http.py
 
 test-a2a:
 	uv run pytest tests/test_a2a_unit.py -v
@@ -72,6 +72,9 @@ test-cloud:
 	uv run python tests/test_cloud_mcp.py
 
 # ---------- Run ----------
+
+mcp-http:
+	MCP_TRANSPORT=streamable-http PORT=8080 uv run python -m mcp_server
 
 mcp-sse:
 	MCP_TRANSPORT=sse PORT=8080 uv run python -m mcp_server
@@ -113,7 +116,7 @@ deploy-mcp-server-cloudrun:
 		--project $(PROJECT_ID) \
 		--region $(REGION) \
 		--image $(IMAGE_NAME) \
-		--set-env-vars="MCP_TRANSPORT=sse,GOOGLE_CLOUD_PROJECT=$(PROJECT_ID),DATABASE_ID=$(DATABASE_ID),COLLECTION=$(COLLECTION)" \
+		--set-env-vars="MCP_TRANSPORT=streamable-http,GOOGLE_CLOUD_PROJECT=$(PROJECT_ID),DATABASE_ID=$(DATABASE_ID),COLLECTION=$(COLLECTION)" \
 		--port 8080 \
 		--memory 512Mi \
 		--timeout 300
