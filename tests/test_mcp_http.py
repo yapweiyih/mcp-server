@@ -114,9 +114,9 @@ async def run_tools_list() -> list[dict]:
         AssertionError: If the MCP handshake or tools/list fails.
     """
     from mcp.client.session import ClientSession
-    from mcp.client.streamable_http import streamablehttp_client
+    from mcp.client.streamable_http import streamable_http_client
 
-    async with streamablehttp_client(MCP_URL) as (
+    async with streamable_http_client(MCP_URL) as (
         read_stream,
         write_stream,
         _,
