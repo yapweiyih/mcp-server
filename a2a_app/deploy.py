@@ -12,6 +12,9 @@ Once deployed, the agent can be accessed via:
 - A2A Python SDK: `a2a_client.send_message(...)`
 - Raw HTTP: POST to the agent's A2A URL
 
+The deploy pipeline:
+    Local test → Deploy → Cloud test → Update .env
+
 Prerequisites:
     - GCP project with Vertex AI and Agent Engine APIs enabled
     - `gcloud auth application-default login` for authentication
@@ -19,6 +22,8 @@ Prerequisites:
 
 Usage:
     uv run python -m a2a_app.deploy
+    uv run python -m a2a_app.deploy --skip-local-test
+    uv run python -m a2a_app.deploy --skip-local-test --skip-cloud-test
     uv run python -m a2a_app.deploy --staging-bucket gs://my-bucket
     uv run python -m a2a_app.deploy --display-name "ER Query Agent (prod)"
 
@@ -30,6 +35,8 @@ import asyncio
 import json
 import logging
 import os
+import sys
+import time
 
 import click
 from dotenv import load_dotenv
@@ -42,6 +49,7 @@ load_dotenv("adk_agent/.env")
 os.environ.pop("MCP_SERVER_URL", None)
 
 logging.basicConfig(level=logging.INFO)
+logging.getLogger("google").setLevel(logging.ERROR)
 logger = logging.getLogger(__name__)
 
 
@@ -81,7 +89,7 @@ def _update_env_file(engine_id: str) -> None:
 
     with open(env_path, "w") as f:
         f.writelines(lines)
-    click.echo(f"📝 Updated .env with A2A_ENGINE_ID={engine_id}")
+    click.echo(f"\n📝 Updated .env with A2A_ENGINE_ID={engine_id}")
 
 
 def _build_a2a_agent():
@@ -163,6 +171,127 @@ def _build_a2a_agent():
     return a2a_agent
 
 
+async def _run_local_test(a2a_agent) -> None:
+    """Run a local test of the A2A agent before deploying.
+
+    Verifies the agent card is valid and sends a test message to confirm
+    the agent executor works correctly.
+
+    Args:
+        a2a_agent: The A2aAgent instance to test.
+
+    Returns:
+        None
+
+    Raises:
+        Exception: If the local test fails.
+    """
+    click.echo("\n🧪 Running local test...")
+
+    a2a_agent.set_up()
+
+    # Test 1: Verify agent card
+    card = await a2a_agent.handle_authenticated_agent_card(request=None, context=None)
+    click.echo(f"  📇 Agent Card: {card.get('name', 'unknown')} — OK")
+
+    # Test 2: Send a test message
+    from starlette.requests import Request
+
+    message_data = {
+        "message": {
+            "messageId": "test-message-001",
+            "content": [{"text": "Hello, what can you help me with?"}],
+            "role": "ROLE_USER",
+        },
+    }
+    scope = {
+        "type": "http",
+        "http_version": "1.1",
+        "method": "POST",
+        "headers": [(b"content-type", b"application/json")],
+    }
+
+    async def receive():
+        return {
+            "type": "http.request",
+            "body": json.dumps(message_data).encode("utf-8"),
+            "more_body": False,
+        }
+
+    request = Request(scope, receive=receive)
+    response = await a2a_agent.on_message_send(request=request, context=None)
+    click.echo(f"  📨 Message send: OK (got response)")
+
+    click.echo("  ✅ Local test completed.\n")
+
+
+async def _run_cloud_test(
+    project_id: str,
+    location: str,
+    resource_id: str,
+) -> None:
+    """Run a smoke test against the deployed A2A agent on Agent Engine.
+
+    Fetches the agent card and sends a test message to verify the agent
+    responds correctly in the cloud environment.
+
+    Args:
+        project_id: GCP project ID.
+        location: GCP region.
+        resource_id: The Agent Engine resource ID.
+
+    Returns:
+        None
+    """
+    import vertexai
+    from google.genai import types as genai_types
+
+    click.echo("\n☁️  Running cloud smoke test...")
+
+    client = vertexai.Client(
+        project=project_id,
+        location=location,
+        http_options=genai_types.HttpOptions(api_version="v1beta1"),
+    )
+
+    resource_name = (
+        f"projects/{project_id}/locations/{location}" f"/reasoningEngines/{resource_id}"
+    )
+
+    remote_agent = client.agent_engines.get(name=resource_name)
+
+    # Test 1: Fetch agent card
+    card = await remote_agent.handle_authenticated_agent_card()
+    card_name = (
+        card.get("name", "unknown")
+        if isinstance(card, dict)
+        else getattr(card, "name", "unknown")
+    )
+    click.echo(f"  📇 Agent Card: {card_name} — OK")
+
+    # Test 2: Send a test message
+    response = await remote_agent.async_on_message_send(
+        message={
+            "role": "user",
+            "parts": [{"text": "hi?"}],
+        },
+    )
+    click.echo(f"  📨 Message send: OK")
+
+    # Extract any text from the response
+    if isinstance(response, dict):
+        result = response.get("result", {})
+        artifacts = result.get("artifacts", [])
+        for artifact in artifacts:
+            parts = artifact.get("parts", [])
+            for part in parts:
+                if "text" in part:
+                    text_preview = part["text"][:100]
+                    click.echo(f"  📝 Response: {text_preview}...")
+
+    click.echo("  ✅ Cloud smoke test completed.\n")
+
+
 @click.command()
 @click.option(
     "--project-id",
@@ -189,19 +318,29 @@ def _build_a2a_agent():
     help="Display name for the deployed agent",
 )
 @click.option(
-    "--test-local",
+    "--skip-local-test",
     is_flag=True,
     default=False,
-    help="Test locally before deploying (does not deploy)",
+    help="Skip the local test before deploying.",
+)
+@click.option(
+    "--skip-cloud-test",
+    is_flag=True,
+    default=False,
+    help="Skip the cloud smoke test after deploying.",
 )
 def deploy_agent_engine(
     project_id: str,
     location: str,
     staging_bucket: str,
     display_name: str,
-    test_local: bool,
+    skip_local_test: bool,
+    skip_cloud_test: bool,
 ) -> None:
-    """Deploy the ER Query ADK agent to Vertex AI Agent Engine as A2A."""
+    """Deploy the ER Query ADK agent to Vertex AI Agent Engine as A2A.
+
+    Pipeline: Local test → Deploy → Cloud test → Update .env
+    """
 
     project_id = project_id or os.getenv("GOOGLE_CLOUD_PROJECT", "ikigai-dev-376122")
     location = location or os.getenv("GOOGLE_CLOUD_LOCATION", "us-central1")
@@ -216,64 +355,34 @@ def deploy_agent_engine(
     """
     )
 
-    click.echo("\n📋 Deployment Parameters:")
-    click.echo(f"  Project:        {project_id}")
-    click.echo(f"  Location:       {location}")
-    click.echo(f"  Display Name:   {display_name}")
-    click.echo(f"  Staging Bucket: {staging_bucket or '(auto)'}")
-    click.echo(f"  Test Local:     {test_local}")
-    click.echo()
+    click.echo("📋 Deployment Parameters:")
+    click.echo(f"  Project:         {project_id}")
+    click.echo(f"  Location:        {location}")
+    click.echo(f"  Display Name:    {display_name}")
+    click.echo(f"  Staging Bucket:  {staging_bucket or '(auto)'}")
+    click.echo(f"  Skip Local Test: {skip_local_test}")
+    click.echo(f"  Skip Cloud Test: {skip_cloud_test}")
 
-    # Build the A2A agent
-    click.echo("🔧 Building A2A agent...")
+    # --- Confirm before proceeding ---
+    if not click.confirm("\n🔍 Proceed with deployment?", default=True):
+        click.echo("❌ Deployment cancelled.")
+        sys.exit(0)
+
+    # --- Step 1: Build A2A agent ---
+    click.echo("\n🔧 Building A2A agent...")
     a2a_agent = _build_a2a_agent()
 
-    if test_local:
-        click.echo("🧪 Testing locally...")
-        a2a_agent.set_up()
+    # --- Step 2: Local test (optional) ---
+    if not skip_local_test:
+        try:
+            asyncio.run(_run_local_test(a2a_agent))
+        except Exception as e:
+            click.echo(f"  ❌ Local test failed: {e}")
+            sys.exit(1)
+    else:
+        click.echo("\n⏭️  Skipping local test.")
 
-        async def _test():
-            # Test agent card
-            card = await a2a_agent.handle_authenticated_agent_card(
-                request=None, context=None
-            )
-            click.echo(f"\n📇 Agent Card:\n{json.dumps(card, indent=2, default=str)}")
-
-            # Test message send
-            from starlette.requests import Request
-
-            message_data = {
-                "message": {
-                    "messageId": "test-message-001",
-                    "content": [{"text": "Hello, what can you help me with?"}],
-                    "role": "ROLE_USER",
-                },
-            }
-            scope = {
-                "type": "http",
-                "http_version": "1.1",
-                "method": "POST",
-                "headers": [(b"content-type", b"application/json")],
-            }
-
-            async def receive():
-                return {
-                    "type": "http.request",
-                    "body": json.dumps(message_data).encode("utf-8"),
-                    "more_body": False,
-                }
-
-            request = Request(scope, receive=receive)
-            response = await a2a_agent.on_message_send(request=request, context=None)
-            click.echo(
-                f"\n📨 Message Response:\n{json.dumps(response, indent=2, default=str)}"
-            )
-
-        asyncio.run(_test())
-        click.echo("\n✅ Local test passed!")
-        return
-
-    # Deploy to Agent Engine
+    # --- Step 3: Deploy ---
     click.echo("🚀 Deploying to Agent Engine (this takes a few minutes)...")
 
     import vertexai
@@ -316,35 +425,62 @@ def deploy_agent_engine(
     if staging_bucket:
         deploy_config["staging_bucket"] = staging_bucket
 
-    remote_agent = client.agent_engines.create(
-        agent=a2a_agent,
-        config=deploy_config,
-    )
+    start = time.perf_counter()
+    try:
+        remote_agent = client.agent_engines.create(
+            agent=a2a_agent,
+            config=deploy_config,
+        )
+    except Exception as e:
+        click.echo(f"  ❌ Deployment failed: {e}")
+        sys.exit(1)
+
+    elapsed = time.perf_counter() - start
+    click.echo(f"\n  ⏱️  Deployment took {elapsed:.2f} seconds")
 
     resource_name = remote_agent.api_resource.name
     resource_id = resource_name.split("/")[-1]
 
+    click.echo(f"  ✅ Agent deployed successfully!")
+    click.echo(f"  🆔 Resource ID: {resource_id}")
+
+    # --- Step 4: Cloud smoke test (optional) ---
+    if not skip_cloud_test:
+        try:
+            asyncio.run(
+                _run_cloud_test(
+                    project_id=project_id,
+                    location=location,
+                    resource_id=resource_id,
+                )
+            )
+        except Exception as e:
+            click.echo(f"  ⚠️  Cloud test failed: {e}")
+            click.echo("  (Deployment succeeded — agent is live but test failed)")
+    else:
+        click.echo("\n⏭️  Skipping cloud smoke test.")
+
+    # --- Step 5: Update .env ---
     _update_env_file(resource_id)
 
-    click.echo("\n✅ Deployment successful!")
-    click.echo(f"\n📋 Deployment Info:")
-    click.echo(f"  Resource Name: {resource_name}")
-    click.echo(f"  Resource ID:   {resource_id}")
-    click.echo(f"  Project:       {project_id}")
-    click.echo(f"  Location:      {location}")
-
-    click.echo(f"\n🔗 To test the deployed agent:")
-    click.echo(f"  uv run python -m a2a_app.test_remote --resource-id {resource_id}")
-
-    click.echo(f"\n🗑️  To delete the deployed agent:")
-    click.echo(f'  uv run python -c "')
-    click.echo(f"    import vertexai")
+    # --- Summary ---
     click.echo(
-        f"    client = vertexai.Client(project='{project_id}', location='{location}')"
+        f"""
+    ╔═══════════════════════════════════════════════════════════╗
+    ║                                                           ║
+    ║   ✅ A2A DEPLOYMENT COMPLETE                              ║
+    ║                                                           ║
+    ║   Resource ID: {resource_id:<41s} ║
+    ║   Project:     {project_id:<41s} ║
+    ║   Location:    {location:<41s} ║
+    ║                                                           ║
+    ╚═══════════════════════════════════════════════════════════╝
+    """
     )
-    click.echo(f"    agent = client.agent_engines.get(name='{resource_name}')")
-    click.echo(f"    agent.delete(force=True)")
-    click.echo(f'  "')
+
+    click.echo(
+        f"🔗 To test: uv run python -m a2a_app.test_remote --resource-id {resource_id}"
+    )
 
 
 if __name__ == "__main__":
