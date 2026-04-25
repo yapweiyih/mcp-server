@@ -269,25 +269,7 @@ async def _run_cloud_test(
     )
     click.echo(f"  📇 Agent Card: {card_name} — OK")
 
-    # Test 2: Send a test message
-    response = await remote_agent.async_on_message_send(
-        message={
-            "role": "user",
-            "parts": [{"text": "hi?"}],
-        },
-    )
-    click.echo(f"  📨 Message send: OK")
-
-    # Extract any text from the response
-    if isinstance(response, dict):
-        result = response.get("result", {})
-        artifacts = result.get("artifacts", [])
-        for artifact in artifacts:
-            parts = artifact.get("parts", [])
-            for part in parts:
-                if "text" in part:
-                    text_preview = part["text"][:100]
-                    click.echo(f"  📝 Response: {text_preview}...")
+    click.echo("  ℹ️  Full message test: use 'make test-a2a-client-remote'")
 
     click.echo("  ✅ Cloud smoke test completed.\n")
 
