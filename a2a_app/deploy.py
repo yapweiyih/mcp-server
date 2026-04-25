@@ -5,9 +5,9 @@ This script deploys the ADK agent to Agent Engine, which provides:
 - Native A2A protocol endpoints (message send, task status, agent card)
 - Built-in session management via Vertex AI Sessions
 
-The deployment uses the `A2aAgent` template from the Vertex AI SDK, which
-wraps the ADK agent with an A2A-compliant executor. Once deployed, the agent
-can be accessed via:
+The deployment uses ADK's built-in `A2aAgentExecutor` with `InMemoryRunner`
+to bridge the A2A protocol and the ADK agent — no custom executor needed.
+Once deployed, the agent can be accessed via:
 - Vertex AI SDK: `remote_agent.on_message_send(...)`
 - A2A Python SDK: `a2a_client.send_message(...)`
 - Raw HTTP: POST to the agent's A2A URL
@@ -23,7 +23,7 @@ Usage:
     uv run python -m a2a_app.deploy --display-name "ER Query Agent (prod)"
 
     # Or via Makefile:
-    make deploy-agent-engine
+    make deploy-a2a-agent-engine
 """
 
 import asyncio
@@ -87,35 +87,22 @@ def _update_env_file(engine_id: str) -> None:
 def _build_a2a_agent():
     """Build the A2aAgent instance for deployment to Agent Engine.
 
-    Creates the three components required by the A2A protocol:
-    1. AgentCard - metadata describing the agent's capabilities
-    2. AgentExecutor - handles incoming A2A messages using ADK Runner
-    3. LlmAgent - the actual ADK agent with MCP tools
+    Uses ADK's built-in A2aAgentExecutor with InMemoryRunner to bridge
+    the A2A protocol and the ADK agent. This replaces a custom executor
+    with ~5 lines of code — the executor automatically handles task state
+    management, session/artifact services, and event streaming.
 
     Returns:
         A2aAgent: A fully configured A2A agent ready for local testing
         or deployment.
     """
-    from a2a.server.agent_execution import AgentExecutor, RequestContext
-    from a2a.server.events import EventQueue
-    from a2a.server.tasks import TaskUpdater
-    from a2a.types import AgentSkill, TaskState, TextPart
-    from a2a.utils import new_agent_text_message
-    from a2a.utils.errors import ServerError
-    from google.adk.agents import Agent
-    from google.adk.artifacts import InMemoryArtifactService
-    from google.adk.memory.in_memory_memory_service import InMemoryMemoryService
-    from google.adk.runners import Runner
-    from google.adk.sessions import InMemorySessionService
-    from google.genai import types
+    from a2a.types import AgentSkill
+    from google.adk.a2a.executor.a2a_agent_executor import A2aAgentExecutor
+    from google.adk.runners import InMemoryRunner
     from vertexai.preview.reasoning_engines import A2aAgent
     from vertexai.preview.reasoning_engines.templates.a2a import create_agent_card
 
-    from adk_agent.tools import (
-        check_pending_tasks_callback,
-        check_task_status,
-        submit_long_task,
-    )
+    from adk_agent.agent import root_agent
 
     # ── 1. Agent Card ────────────────────────────────────────────────
     er_search_skill = AgentSkill(
@@ -149,7 +136,7 @@ def _build_a2a_agent():
     )
 
     agent_card = create_agent_card(
-        agent_name="er_query_agent",
+        agent_name=root_agent.name,
         description=(
             "An AI agent that queries Expert Request data from Firestore "
             "and manages background tasks. Supports searching by email, "
@@ -158,154 +145,19 @@ def _build_a2a_agent():
         skills=[er_search_skill, background_task_skill],
     )
 
-    # ── 2. Agent Executor ────────────────────────────────────────────
-    # Instruction for the agent (simplified for A2A since it's agent-to-agent)
-    AGENT_INSTRUCTION = """You are an Expert Request (ER) query assistant. You help
-    find information about Expert Requests from the Firestore database.
-
-    You have access to these MCP tools:
-    1. search_er_by_email - Search ERs by CE email
-    2. search_er_by_date - Search ERs by creation date
-    3. get_er_fields - Get specific fields from an ER by name
-
-    And these direct tools:
-    4. submit_long_task - Submit a background task
-    5. check_task_status - Check a task's status
-
-    {task_completed_notification}
-
-    Guidelines:
-    - Always use the appropriate tool. Never make up ER data.
-    - Format results clearly.
-    - For email queries, assume @google.com if not specified.
-    """
-
-    class ERQueryAgentExecutor(AgentExecutor):
-        """A2A executor that wraps the ADK ER Query agent.
-
-        Handles incoming A2A messages by routing them through the ADK Runner,
-        which manages tool calls, LLM interactions, and session state.
-        """
-
-        def __init__(self, agent: Agent):
-            self.agent = agent
-            self.runner = None
-
-        def _init_runner(self) -> None:
-            """Lazily initialize the ADK Runner on first request."""
-            if not self.runner:
-                self.runner = Runner(
-                    app_name=self.agent.name,
-                    agent=self.agent,
-                    artifact_service=InMemoryArtifactService(),
-                    session_service=InMemorySessionService(),
-                    memory_service=InMemoryMemoryService(),
-                )
-
-        async def cancel(self, context: RequestContext, event_queue: EventQueue):
-            """Cancel is not supported for this agent."""
-            from a2a.types import UnsupportedOperationError
-
-            raise ServerError(error=UnsupportedOperationError())
-
-        async def execute(
-            self,
-            context: RequestContext,
-            event_queue: EventQueue,
-        ) -> None:
-            """Execute an A2A task by running the ADK agent.
-
-            Args:
-                context: The A2A request context with message and task info.
-                event_queue: Queue for sending A2A events back to the client.
-            """
-            self._init_runner()
-
-            if not context.message:
-                return
-
-            user_id = (
-                context.message.metadata.get("user_id")
-                if context.message and context.message.metadata
-                else "a2a_user"
-            )
-
-            updater = TaskUpdater(event_queue, context.task_id, context.context_id)
-            if not context.current_task:
-                await updater.submit()
-            await updater.start_work()
-
-            query = context.get_user_input()
-            content = types.Content(role="user", parts=[types.Part(text=query)])
-
-            try:
-                session = await self.runner.session_service.get_session(
-                    app_name=self.runner.app_name,
-                    user_id=user_id,
-                    session_id=context.context_id,
-                ) or await self.runner.session_service.create_session(
-                    app_name=self.runner.app_name,
-                    user_id=user_id,
-                    session_id=context.context_id,
-                )
-
-                final_event = None
-                async for event in self.runner.run_async(
-                    session_id=session.id,
-                    user_id=user_id,
-                    new_message=content,
-                ):
-                    if event.is_final_response():
-                        final_event = event
-
-                if final_event and final_event.content and final_event.content.parts:
-                    response_text = "".join(
-                        part.text
-                        for part in final_event.content.parts
-                        if hasattr(part, "text") and part.text
-                    )
-                    if response_text:
-                        await updater.add_artifact(
-                            [TextPart(text=response_text)],
-                            name="result",
-                        )
-                        await updater.complete()
-                        return
-
-                await updater.update_status(
-                    TaskState.failed,
-                    message=new_agent_text_message("Failed to generate a response."),
-                    final=True,
-                )
-
-            except Exception as e:
-                logger.error("A2A execution error: %s", e)
-                await updater.update_status(
-                    TaskState.failed,
-                    message=new_agent_text_message(f"An error occurred: {str(e)}"),
-                    final=True,
-                )
-
-    # ── 3. LLM Agent (reuse existing tools) ──────────────────────────
-    # _get_tools() returns the full tool list (MCP or direct + long-running)
-    from adk_agent.agent import _get_tools
-
-    llm_agent = Agent(
-        name="er_query_agent",
-        model="gemini-2.5-flash",
-        instruction=AGENT_INSTRUCTION,
-        description=(
-            "An agent that queries Expert Request data from Firestore "
-            "and runs background tasks"
-        ),
-        tools=_get_tools(),
-        before_agent_callback=check_pending_tasks_callback,
-    )
-
-    # ── 4. Assemble A2aAgent ─────────────────────────────────────────
+    # ── 2. Assemble A2aAgent with built-in executor ──────────────────
+    # A2aAgentExecutor handles all A2A ↔ ADK bridging automatically:
+    # - Task state management (submit, start_work, complete, failed)
+    # - Session/artifact/memory services (in-memory via InMemoryRunner)
+    # - Event streaming and text extraction
     a2a_agent = A2aAgent(
         agent_card=agent_card,
-        agent_executor_builder=lambda: ERQueryAgentExecutor(agent=llm_agent),
+        agent_executor_builder=lambda: A2aAgentExecutor(
+            runner=InMemoryRunner(
+                app_name=root_agent.name,
+                agent=root_agent,
+            )
+        ),
     )
 
     return a2a_agent
