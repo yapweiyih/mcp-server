@@ -43,7 +43,7 @@ from adk_agent.tools import (
     submit_long_task,
 )
 
-load_dotenv()
+load_dotenv("adk_agent/.env")
 
 # --- Logging ---
 logging.basicConfig(
