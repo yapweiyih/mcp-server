@@ -85,6 +85,9 @@ agent-web:
 agent-chat:
 	uv run adk run adk_agent
 
+
+# ---------- AGUI ----------
+
 agui-server:
 	uv run python agui_server.py
 
