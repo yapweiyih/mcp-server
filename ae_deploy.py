@@ -239,7 +239,7 @@ async def run_local_test(env_config: dict[str, str]) -> None:
     )
 
     session = await app.async_create_session(user_id="u_123")
-    prompt = "What expert requests are assigned to weiyih@google.com?"
+    prompt = "list er for alex.chen@example.com"
     click.echo(f"  Session created. Sending prompt: '{prompt}'")
 
     async for event in app.async_stream_query(
@@ -409,7 +409,7 @@ async def test_on_cloud(env_config: dict[str, str], engine_id: str) -> None:
     session_id = session.get("id", session) if isinstance(session, dict) else session
     click.echo(f"  Session created: {session_id}")
 
-    prompt = "What expert requests are assigned to weiyih@google.com?"
+    prompt = "list er for alex.chen@example.com"
     request_json = json.dumps(
         {
             "user_id": "u_123",
