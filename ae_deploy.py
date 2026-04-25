@@ -382,12 +382,12 @@ def deploy_without_agent_identity(
     return engine_id
 
 
-def test_on_cloud(env_config: dict[str, str], engine_id: str) -> None:
+async def test_on_cloud(env_config: dict[str, str], engine_id: str) -> None:
     """Run a smoke test against the deployed agent on Vertex AI.
 
     Retrieves the deployed agent engine, creates a session, and sends
-    a test prompt via streaming to verify the agent responds correctly
-    in the cloud environment.
+    a test prompt via async streaming to verify the agent responds
+    correctly in the cloud environment.
 
     Args:
         env_config: Dictionary with validated environment variables.
@@ -405,37 +405,29 @@ def test_on_cloud(env_config: dict[str, str], engine_id: str) -> None:
     )
 
     live_app = vertexai.agent_engines.get(resource_name)
-    session = live_app.create_session(user_id="u_123")
-    click.echo(f"  Session created: {session.get('id', session)}")
+    session = await live_app.async_create_session(user_id="u_123")
+    session_id = session.get("id", session) if isinstance(session, dict) else session
+    click.echo(f"  Session created: {session_id}")
 
     prompt = "What expert requests are assigned to weiyih@google.com?"
-    request_json = json.dumps(
-        {
-            "user_id": "u_123",
-            "session_id": session["id"],
-            "message": {
-                "parts": [{"text": prompt}],
-                "role": "user",
-            },
-        }
-    )
-
     click.echo(f"  Sending prompt: '{prompt}'")
-    events = list(live_app.streaming_agent_run_with_events(request_json=request_json))
 
-    for event_group in events:
-        for event in event_group.get("events", []):
-            content = event.get("content", {})
-            parts = content.get("parts", [])
-            for part in parts:
-                if "function_call" in part:
-                    fc = part["function_call"]
-                    click.echo(f"  🔧 Function Call: {fc.get('name')}")
-                elif "function_response" in part:
-                    fr = part["function_response"]
-                    click.echo(f"  📨 Function Response: {fr.get('name')}")
-                elif "text" in part:
-                    click.echo(f"  📝 Text: {part['text']}")
+    async for event in live_app.async_stream_query(
+        user_id="u_123",
+        session_id=session_id,
+        message=prompt,
+    ):
+        content = event.get("content", {})
+        parts = content.get("parts", [])
+        for part in parts:
+            if "function_call" in part:
+                fc = part["function_call"]
+                click.echo(f"  🔧 Function Call: {fc.get('name')}")
+            elif "function_response" in part:
+                fr = part["function_response"]
+                click.echo(f"  📨 Function Response: {fr.get('name')}")
+            elif "text" in part:
+                click.echo(f"  📝 Text: {part['text']}")
 
     click.echo("  ✅ Cloud smoke test completed.\n")
 
@@ -580,7 +572,7 @@ def deploy(
     # --- Step 6: Cloud smoke test (optional) ---
     if not skip_cloud_test:
         try:
-            test_on_cloud(env_config=env_config, engine_id=engine_id)
+            asyncio.run(test_on_cloud(env_config=env_config, engine_id=engine_id))
         except Exception as e:
             click.echo(f"  ⚠️  Cloud test failed: {e}")
             click.echo("  (Deployment succeeded — agent is live but test failed)")
