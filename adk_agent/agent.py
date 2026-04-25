@@ -20,6 +20,7 @@ Why MCP over direct function calls?
 """
 
 import json
+import logging
 import os
 import sys
 
@@ -181,10 +182,12 @@ def _get_tools() -> list:
     Returns:
         List of tools for the agent.
     """
+    logger = logging.getLogger(__name__)
     mcp_server_url = os.getenv("MCP_SERVER_URL")
 
     if mcp_server_url:
         # Remote MCP server (Cloud Run deployment via Streamable HTTP)
+        logger.info("Using remote MCP server: %s", mcp_server_url)
         from google.adk.tools.mcp_tool import McpToolset
         from google.adk.tools.mcp_tool.mcp_session_manager import (
             StreamableHTTPConnectionParams,
@@ -213,6 +216,7 @@ def _get_tools() -> list:
         ]
     else:
         # Direct function tools (picklable for Agent Engine deployment)
+        logger.info("Using local function tools (no MCP_SERVER_URL set)")
         return [
             search_er_by_email,
             search_er_by_date,

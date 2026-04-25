@@ -93,10 +93,12 @@ def _get_mcp_toolset() -> McpToolset:
     mcp_server_url = os.getenv("MCP_SERVER_URL")
 
     if mcp_server_url:
+        logger.info("Using remote MCP server (SSE): %s", mcp_server_url)
         return McpToolset(
             connection_params=SseConnectionParams(url=mcp_server_url),
         )
     else:
+        logger.info("Using local MCP server (stdio subprocess)")
         return McpToolset(
             connection_params=StdioConnectionParams(
                 server_params=StdioServerParameters(
