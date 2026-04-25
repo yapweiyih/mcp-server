@@ -399,8 +399,14 @@ def deploy_agent_engine(
             "GOOGLE_GENAI_USE_VERTEXAI": "True",
             "COLLECTION": os.getenv("COLLECTION", "expert_requests_dev"),
             "DATABASE_ID": os.getenv("DATABASE_ID", "ikigai-dev"),
+            "NUM_WORKERS": "1",
         },
         "extra_packages": ["adk_agent", "er_query", "mcp_server"],
+        # Force single instance — A2aAgentExecutor uses an in-memory task
+        # store that is per-process. Multiple workers cause "Task not found"
+        # errors when the status poll hits a different worker than the one
+        # that created the task.
+        "max_instances": 1,
     }
 
     staging_bucket = staging_bucket or os.getenv("STAGING_BUCKET")
