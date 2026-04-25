@@ -32,11 +32,12 @@ from ag_ui_adk import ADKAgent, AGUIToolset, add_adk_fastapi_endpoint
 from google.adk.agents import Agent
 from google.adk.tools.mcp_tool import McpToolset
 from google.adk.tools.mcp_tool.mcp_session_manager import (
-    SseConnectionParams,
+    StreamableHTTPConnectionParams,
     StdioConnectionParams,
 )
 from mcp import StdioServerParameters
 
+from adk_agent.agent import _get_identity_token
 from adk_agent.tools import (
     check_pending_tasks_callback,
     check_task_status,
@@ -82,22 +83,39 @@ Guidelines:
 
 
 def _get_mcp_toolset() -> McpToolset:
-    """Create the appropriate MCP toolset based on environment config.
+    """Create MCP toolset using Streamable HTTP (remote) or stdio (local).
+
+    When MCP_SERVER_URL is set, connects to the remote MCP server via
+    Streamable HTTP transport (/mcp endpoint). Otherwise, spawns a local
+    MCP server subprocess via stdio.
 
     Returns:
-        McpToolset configured for either stdio (local) or SSE (remote)
-        connection to the ER Query MCP server.
+        McpToolset configured for the appropriate transport.
     """
     import sys
 
     mcp_server_url = os.getenv("MCP_SERVER_URL")
 
     if mcp_server_url:
-        logger.info("Using remote MCP server (SSE): %s", mcp_server_url)
+        # Remote MCP server via Streamable HTTP
+        mcp_url = mcp_server_url.rstrip("/")
+        if not mcp_url.endswith("/mcp"):
+            mcp_url = f"{mcp_url}/mcp"
+
+        headers = {}
+        token = _get_identity_token(mcp_server_url)
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+
+        logger.info("Using remote MCP server (Streamable HTTP): %s", mcp_url)
         return McpToolset(
-            connection_params=SseConnectionParams(url=mcp_server_url),
+            connection_params=StreamableHTTPConnectionParams(
+                url=mcp_url,
+                headers=headers,
+            )
         )
     else:
+        # Local MCP server via stdio subprocess
         logger.info("Using local MCP server (stdio subprocess)")
         return McpToolset(
             connection_params=StdioConnectionParams(
@@ -114,7 +132,10 @@ def _get_mcp_toolset() -> McpToolset:
 
 
 def create_adk_agent() -> Agent:
-    """Create the ADK agent with MCP tools and custom tools.
+    """Create the ADK agent with MCP tools for AG-UI.
+
+    Uses MCP toolset (Streamable HTTP or stdio) to connect to the ER Query
+    MCP server, plus direct function tools for long-running tasks.
 
     Returns:
         Agent: A fully configured ADK agent for ER queries.
