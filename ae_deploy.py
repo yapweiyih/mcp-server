@@ -405,29 +405,39 @@ async def test_on_cloud(env_config: dict[str, str], engine_id: str) -> None:
     )
 
     live_app = vertexai.agent_engines.get(resource_name)
-    session = await live_app.async_create_session(user_id="u_123")
+    session = live_app.create_session(user_id="u_123")
     session_id = session.get("id", session) if isinstance(session, dict) else session
     click.echo(f"  Session created: {session_id}")
 
     prompt = "What expert requests are assigned to weiyih@google.com?"
+    request_json = json.dumps(
+        {
+            "user_id": "u_123",
+            "session_id": session_id,
+            "message": {
+                "parts": [{"text": prompt}],
+                "role": "user",
+            },
+        }
+    )
+
     click.echo(f"  Sending prompt: '{prompt}'")
 
-    async for event in live_app.async_stream_query(
-        user_id="u_123",
-        session_id=session_id,
-        message=prompt,
+    async for event_group in live_app.streaming_agent_run_with_events(
+        request_json=request_json,
     ):
-        content = event.get("content", {})
-        parts = content.get("parts", [])
-        for part in parts:
-            if "function_call" in part:
-                fc = part["function_call"]
-                click.echo(f"  🔧 Function Call: {fc.get('name')}")
-            elif "function_response" in part:
-                fr = part["function_response"]
-                click.echo(f"  📨 Function Response: {fr.get('name')}")
-            elif "text" in part:
-                click.echo(f"  📝 Text: {part['text']}")
+        for event in event_group.get("events", []):
+            content = event.get("content", {})
+            parts = content.get("parts", [])
+            for part in parts:
+                if "function_call" in part:
+                    fc = part["function_call"]
+                    click.echo(f"  🔧 Function Call: {fc.get('name')}")
+                elif "function_response" in part:
+                    fr = part["function_response"]
+                    click.echo(f"  📨 Function Response: {fr.get('name')}")
+                elif "text" in part:
+                    click.echo(f"  📝 Text: {part['text']}")
 
     click.echo("  ✅ Cloud smoke test completed.\n")
 
