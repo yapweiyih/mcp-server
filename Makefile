@@ -23,14 +23,14 @@
 #   make test-gemini-enterprise       — Test ADK agent on Gemini Enterprise
 #
 # A2A local dev:
-#   Terminal 1: make a2a-server
-#   Terminal 2: make test-a2a-client-local
+#   make test-a2a-local — Start server, run client test, stop server (single command)
+#   Or manually: Terminal 1: make a2a-server / Terminal 2: make test-a2a-client-local
 
 .PHONY: install test test-all lint format clean \
         mcp-http mcp-sse test-mcp \
         agent-web agent-chat \
         agui-server agui-frontend agui-install \
-        a2a-server test-a2a test-a2a-client-local \
+        a2a-server test-a2a test-a2a-client-local test-a2a-local \
         deploy-mcp-server-cloudrun deploy-adk-agent-engine deploy-a2a-agent-engine \
         deploy-adk-gemini-enterprise delete-gemini-enterprise test-gemini-enterprise \
         test-a2a-remote test-a2a-client-remote test-cloud
@@ -104,6 +104,17 @@ a2a-server:
 
 test-a2a-client-local:
 	uv run python -m a2a_app.test_client_agent --local
+
+test-a2a-local:
+	@echo "Starting A2A server in background..."
+	@uv run python -m a2a_app.server & A2A_PID=$$!; \
+	sleep 3; \
+	echo "Running A2A client test..."; \
+	uv run python -m a2a_app.test_client_agent --local; \
+	EXIT_CODE=$$?; \
+	echo "Stopping A2A server (PID $$A2A_PID)..."; \
+	kill $$A2A_PID 2>/dev/null; \
+	exit $$EXIT_CODE
 
 test-a2a-remote:
 	uv run python -m a2a_app.test_remote $(if $(RESOURCE_ID),--resource-id $(RESOURCE_ID))

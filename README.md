@@ -219,7 +219,8 @@ Copy `adk_agent/.env_example` to `adk_agent/.env` and fill in:
 | `agui-frontend` | CopilotKit frontend (port 3000) |
 | `agui-install` | Install frontend npm dependencies |
 | `a2a-server` | A2A server locally |
-| `test-a2a-client-local` | Test A2A client (local) |
+| `test-a2a-local` | A2A end-to-end: start server, run client, stop (single command) |
+| `test-a2a-client-local` | Test A2A client (requires separate `make a2a-server`) |
 | `test-a2a-remote` | Test remote A2A server |
 | `test-a2a-client-remote` | Test A2A client (remote) |
 | `deploy-mcp-server-cloudrun` | Build + deploy MCP to Cloud Run |
