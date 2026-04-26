@@ -19,6 +19,8 @@
 #   bash ge_a2a_register.sh update <AGENT_ID>
 #   bash ge_a2a_register.sh update-auth <AGENT_ID>
 #   bash ge_a2a_register.sh delete <AGENT_ID>
+#   bash ge_a2a_register.sh create-auth
+#   bash ge_a2a_register.sh delete-auth
 
 set -euo pipefail
 
@@ -130,9 +132,9 @@ build_payload() {
 
 # ─── Usage ────────────────────────────────────────────────────────────
 usage() {
-  echo "Usage: $0 { register | register-auth | list [name] | get <AGENT_ID> | update <AGENT_ID> | update-auth <AGENT_ID> | delete <AGENT_ID> }"
+  echo "Usage: $0 <command> [args]"
   echo ""
-  echo "Commands:"
+  echo "Agent commands:"
   echo "  register              Register the A2A agent with Gemini Enterprise"
   echo "  register-auth         Register with OAuth authorizationConfig (needs AUTH_ID)"
   echo "  list [name]           List all agents (optionally filter by name)"
@@ -140,6 +142,10 @@ usage() {
   echo "  update <AGENT_ID>     Update an existing agent's card and config"
   echo "  update-auth <AGENT_ID> Update with OAuth authorizationConfig"
   echo "  delete <AGENT_ID>     Delete an agent registration"
+  echo ""
+  echo "Authorization commands:"
+  echo "  create-auth           Create OAuth authorization resource (needs OAUTH_CLIENT_ID/SECRET)"
+  echo "  delete-auth           Delete the OAuth authorization resource"
   echo ""
   echo "Configuration is loaded from adk_agent/.env"
   exit 1
@@ -325,6 +331,70 @@ case $COMMAND in
 
     echo ""
     echo "✅ Delete complete."
+    ;;
+
+  create-auth)
+    : "${AUTH_ID:?Missing AUTH_ID in .env}"
+    : "${OAUTH_CLIENT_ID:?Missing OAUTH_CLIENT_ID in .env}"
+    : "${OAUTH_CLIENT_SECRET:?Missing OAUTH_CLIENT_SECRET in .env}"
+    : "${OAUTH_AUTH_URI:?Missing OAUTH_AUTH_URI in .env}"
+    OAUTH_TOKEN_URI="${OAUTH_TOKEN_URI:-https://oauth2.googleapis.com/token}"
+
+    AUTH_BASE_URL="https://${ENDPOINT_LOCATION}-discoveryengine.googleapis.com/v1alpha/projects/${PROJECT_NUMBER}/locations/${ENDPOINT_LOCATION}/authorizations"
+
+    echo ""
+    echo "🔐 Action: CREATE authorization resource"
+    echo "  Project:    ${GOOGLE_CLOUD_PROJECT}"
+    echo "  Endpoint:   ${ENDPOINT_LOCATION}"
+    echo "  AUTH_ID:    ${AUTH_ID}"
+    echo "  Client ID:  ${OAUTH_CLIENT_ID:0:20}..."
+    echo "  Token URI:  ${OAUTH_TOKEN_URI}"
+    confirm
+
+    echo ""
+    echo "🔑 Creating authorization resource..."
+    curl -s -X POST \
+      -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+      -H "Content-Type: application/json" \
+      -H "X-Goog-User-Project: ${PROJECT_NUMBER}" \
+      -w "\nHTTP Status Code: %{http_code}\n" \
+      "${AUTH_BASE_URL}?authorizationId=${AUTH_ID}" \
+      -d '{
+        "name": "projects/'"${PROJECT_NUMBER}"'/locations/'"${ENDPOINT_LOCATION}"'/authorizations/'"${AUTH_ID}"'",
+        "serverSideOauth2": {
+          "clientId": "'"${OAUTH_CLIENT_ID}"'",
+          "clientSecret": "'"${OAUTH_CLIENT_SECRET}"'",
+          "authorizationUri": "'"${OAUTH_AUTH_URI}"'",
+          "tokenUri": "'"${OAUTH_TOKEN_URI}"'"
+        }
+      }'
+
+    echo ""
+    echo "✅ Authorization resource created."
+    ;;
+
+  delete-auth)
+    : "${AUTH_ID:?Missing AUTH_ID in .env}"
+
+    AUTH_BASE_URL="https://${ENDPOINT_LOCATION}-discoveryengine.googleapis.com/v1alpha/projects/${PROJECT_NUMBER}/locations/${ENDPOINT_LOCATION}/authorizations"
+
+    echo ""
+    echo "⚠️  Action: DELETE authorization resource"
+    echo "  Project:  ${GOOGLE_CLOUD_PROJECT}"
+    echo "  AUTH_ID:  ${AUTH_ID}"
+    confirm
+
+    echo ""
+    echo "🗑️  Deleting authorization resource..."
+    curl -s -X DELETE \
+      -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+      -H "Content-Type: application/json" \
+      -H "X-Goog-User-Project: ${PROJECT_NUMBER}" \
+      -w "\nHTTP Status Code: %{http_code}\n" \
+      "${AUTH_BASE_URL}/${AUTH_ID}"
+
+    echo ""
+    echo "✅ Authorization resource deleted."
     ;;
 
   *)
