@@ -150,6 +150,9 @@ deploy-a2a-gemini-enterprise:
 list-a2a-gemini-enterprise:
 	bash ge_a2a_register.sh list
 
+get-agent-card:
+	uv run python ge_get_agent_card.py
+
 delete-gemini-enterprise:
 	bash ge_delete_agent.sh
 
