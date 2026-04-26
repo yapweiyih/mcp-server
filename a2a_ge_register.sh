@@ -97,6 +97,18 @@ curl_jq() {
   rm -f "$tmpfile"
 }
 
+# Helper: update a variable in adk_agent/.env
+update_env_var() {
+  local key=$1 value=$2
+  local env_file="${SCRIPT_DIR}/adk_agent/.env"
+  if grep -q "^${key}=" "$env_file" 2>/dev/null; then
+    sed -i '' "s/^${key}=.*/${key}=${value}/" "$env_file"
+  else
+    echo "${key}=${value}" >> "$env_file"
+  fi
+  echo "✅ Updated ${key}=${value} in adk_agent/.env"
+}
+
 usage() {
   echo "Usage: $0 {"
   echo "  register |"
@@ -118,38 +130,41 @@ fi
 COMMAND=$1
 
 case $COMMAND in
-  register)
-    curl_jq -X POST \
+  register|register-auth)
+    PAYLOAD='{
+      "name": "'"${DISPLAY_NAME}"'",
+      "displayName": "'"${DISPLAY_NAME}"'",
+      "description": "'"${DESCRIPTION}"'",
+      "a2aAgentDefinition": {
+        "jsonAgentCard": "'"${AGENT_CARD}"'"
+      }'
+    if [ "$COMMAND" = "register-auth" ]; then
+      PAYLOAD="${PAYLOAD}"',
+      "authorizationConfig": {
+        "agentAuthorization": "projects/'"${PROJECT_NUMBER}"'/locations/global/authorizations/'"${A2A_AUTH_ID}"'"
+      }'
+    fi
+    PAYLOAD="${PAYLOAD}"'}'
+
+    TMPFILE=$(mktemp)
+    HTTP_CODE=$(curl -s -o "$TMPFILE" -w "%{http_code}" -X POST \
       -H "Authorization: Bearer $(gcloud auth print-access-token)" \
       -H "Content-Type: application/json" \
       -H "X-Goog-User-Project: ${PROJECT_NUMBER}" \
       "${BASE_URL}" \
-      -d '{
-        "name": "'"${DISPLAY_NAME}"'",
-        "displayName": "'"${DISPLAY_NAME}"'",
-        "description": "'"${DESCRIPTION}"'",
-        "a2aAgentDefinition": {
-          "jsonAgentCard": "'"${AGENT_CARD}"'"
-        }
-      }'
-    ;;
-  register-auth)
-    curl_jq -X POST \
-      -H "Authorization: Bearer $(gcloud auth print-access-token)" \
-      -H "Content-Type: application/json" \
-      -H "X-Goog-User-Project: ${PROJECT_NUMBER}" \
-      "${BASE_URL}" \
-      -d '{
-        "name": "'"${DISPLAY_NAME}"'",
-        "displayName": "'"${DISPLAY_NAME}"'",
-        "description": "'"${DESCRIPTION}"'",
-        "a2aAgentDefinition": {
-          "jsonAgentCard": "'"${AGENT_CARD}"'"
-        },
-        "authorizationConfig": {
-          "agentAuthorization": "projects/'"${PROJECT_NUMBER}"'/locations/global/authorizations/'"${A2A_AUTH_ID}"'"
-        }
-      }'
+      -d "${PAYLOAD}")
+    jq . "$TMPFILE" 2>/dev/null || cat "$TMPFILE"
+    echo ""
+    echo "HTTP Status Code: ${HTTP_CODE}"
+
+    # Auto-populate A2A_AGENT_ID on success
+    if [ "$HTTP_CODE" = "200" ]; then
+      NEW_ID=$(jq -r '.name // empty' "$TMPFILE" | awk -F/ '{print $NF}')
+      if [ -n "$NEW_ID" ] && [ "$NEW_ID" != "null" ]; then
+        update_env_var "A2A_AGENT_ID" "$NEW_ID"
+      fi
+    fi
+    rm -f "$TMPFILE"
     ;;
   create-auth)
     curl_jq -X POST \
