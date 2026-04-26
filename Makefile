@@ -67,12 +67,14 @@ test:
 test-all:
 	uv run pytest -v -s
 
+# Start local MCP Server, the test MCP decatored function.
 test-mcp:
 	uv run python tests/test_mcp_http.py
 
 test-a2a:
 	uv run pytest tests/test_a2a_unit.py -v
 
+# Test MCP Server on cloud
 test-cloud:
 	uv run python tests/test_cloud_mcp.py
 
@@ -105,14 +107,14 @@ agui-install:
 # ---------- A2A ----------
 
 a2a-server:
-	uv run python -m a2a_app.server
+	MCP_SERVER_URL= uv run python -m a2a_app.server
 
 test-a2a-client-local:
 	uv run python -m a2a_app.test_client_agent --local
 
 test-a2a-local:
 	@echo "Starting A2A server in background..."
-	@uv run python -m a2a_app.server & A2A_PID=$$!; \
+	@MCP_SERVER_URL= uv run python -m a2a_app.server & A2A_PID=$$!; \
 	sleep 3; \
 	echo "Running A2A client test..."; \
 	uv run python -m a2a_app.test_client_agent --local; \
