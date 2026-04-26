@@ -145,10 +145,10 @@ deploy-adk-gemini-enterprise:
 	bash ge_register.sh register
 
 deploy-a2a-gemini-enterprise:
-	bash ge_a2a_register.sh register
+	bash a2a_ge_register.sh register
 
 list-a2a-gemini-enterprise:
-	bash ge_a2a_register.sh list
+	bash a2a_ge_register.sh list
 
 get-a2a-agent-card-from-ae:
 	uv run python ge_get_agent_card.py
