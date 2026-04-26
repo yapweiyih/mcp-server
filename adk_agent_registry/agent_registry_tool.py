@@ -1,20 +1,31 @@
-"""Use Agent Registry to discover and orchestrate a remote A2A agent.
+"""Use Agent Registry to discover, list, and orchestrate remote agents.
 
-Demonstrates how to use the ADK Agent Registry integration to:
-1. Look up a registered A2A agent by its resource name
-2. Create a local orchestrator agent with the remote agent as a sub-agent
-3. Run the orchestrator to delegate tasks to the remote agent
+Provides CLI subcommands to:
+1. List all registered A2A agents and MCP servers
+2. Create a local orchestrator agent with a remote A2A agent as sub-agent
 
 Usage:
-    uv run python adk_agent_registry/agent_registry_tool.py
+    # List all registered agents and MCP servers:
+    uv run python adk_agent_registry/agent_registry_tool.py list
+
+    # Create orchestrator with a remote A2A agent:
+    uv run python adk_agent_registry/agent_registry_tool.py orchestrate
+
+    # Specify a custom agent name:
+    uv run python adk_agent_registry/agent_registry_tool.py orchestrate \
+        --agent-name "projects/.../agents/agentregistry-..."
 """
 
 import os
 
+import click
+from dotenv import load_dotenv
 from google.adk.agents import Agent
 from google.adk.integrations.agent_registry import AgentRegistry
 from google.adk.models import Gemini
 from google.genai import types
+
+load_dotenv("adk_agent_registry/.env", override=True)
 
 PROJECT_ID = os.getenv("GOOGLE_CLOUD_PROJECT", "hello-world-418507")
 LOCATION = os.getenv("GOOGLE_CLOUD_LOCATION", "us-central1")
@@ -27,17 +38,62 @@ AGENT_NAME = os.getenv(
 os.environ["GOOGLE_GENAI_USE_VERTEXAI"] = "True"
 
 
-def create_orchestrator_agent() -> Agent:
+def list_registered_agents(
+    project_id: str,
+    location: str,
+) -> list[dict]:
+    """List all A2A agents registered in the Agent Registry.
+
+    Args:
+        project_id: GCP project ID.
+        location: GCP region (e.g., 'us-central1').
+
+    Returns:
+        list[dict]: List of agent dictionaries from the registry.
+    """
+    registry = AgentRegistry(project_id=project_id, location=location)
+    response = registry.list_agents()
+    return response.get("agents", [])
+
+
+def list_registered_mcp_servers(
+    project_id: str,
+    location: str,
+) -> list[dict]:
+    """List all MCP servers registered in the Agent Registry.
+
+    Args:
+        project_id: GCP project ID.
+        location: GCP region (e.g., 'us-central1').
+
+    Returns:
+        list[dict]: List of MCP server dictionaries from the registry.
+    """
+    registry = AgentRegistry(project_id=project_id, location=location)
+    response = registry.list_mcp_servers()
+    return response.get("mcpServers", [])
+
+
+def create_orchestrator_agent(
+    project_id: str,
+    location: str,
+    agent_name: str,
+) -> Agent:
     """Create an orchestrator agent with a remote A2A agent as sub-agent.
 
     Uses the Agent Registry to discover and connect to a remote A2A agent,
     then wraps it as a sub-agent of a local orchestrator.
 
+    Args:
+        project_id: GCP project ID.
+        location: GCP region (e.g., 'us-central1').
+        agent_name: Full resource name of the remote A2A agent in Agent Registry.
+
     Returns:
         Agent: An ADK Agent configured with the remote agent as a sub-agent.
     """
-    registry = AgentRegistry(project_id=PROJECT_ID, location=LOCATION)
-    remote_agent = registry.get_remote_a2a_agent(AGENT_NAME)
+    registry = AgentRegistry(project_id=project_id, location=location)
+    remote_agent = registry.get_remote_a2a_agent(agent_name)
 
     orchestrator = Agent(
         name="er_query_agent",
@@ -56,21 +112,132 @@ def create_orchestrator_agent() -> Agent:
     return orchestrator
 
 
-def list_registered_agents():
-    """List all agents registered in the Agent Registry."""
-    registry = AgentRegistry(project_id=PROJECT_ID, location=LOCATION)
-    agents_response = registry.list_agents()
+# ---------- CLI ----------
 
-    if "agents" in agents_response:
-        for agent in agents_response["agents"]:
-            print(f"Display Name: {agent.get('displayName')}")
-            print(f"Resource Name (AGENT_NAME): {agent.get('name')}")
-            print("-" * 20)
+
+@click.group()
+def cli():
+    """Agent Registry CLI — list and orchestrate registered agents."""
+    pass
+
+
+@cli.command()
+@click.option(
+    "--project-id",
+    type=str,
+    default=None,
+    help=f"GCP project ID (default: {PROJECT_ID})",
+)
+@click.option(
+    "--location",
+    type=str,
+    default=None,
+    help=f"GCP region (default: {LOCATION})",
+)
+def list(
+    project_id: str | None,
+    location: str | None,
+) -> None:
+    """List all registered A2A agents and MCP servers."""
+    project_id = project_id or PROJECT_ID
+    location = location or LOCATION
+
+    click.echo(
+        """
+    ╔═══════════════════════════════════════════════════════════╗
+    ║                                                           ║
+    ║   📋 AGENT REGISTRY — List Resources                      ║
+    ║                                                           ║
+    ╚═══════════════════════════════════════════════════════════╝
+    """
+    )
+
+    click.echo(f"  Project:  {project_id}")
+    click.echo(f"  Location: {location}")
+
+    # List A2A agents
+    click.echo("\n── A2A Agents ──────────────────────────────────────────────")
+    agents = list_registered_agents(project_id, location)
+    if agents:
+        for agent in agents:
+            click.echo(f"  📌 {agent.get('displayName', 'N/A')}")
+            click.echo(f"     Name: {agent.get('name', 'N/A')}")
+            desc = agent.get("description", "")
+            if desc:
+                click.echo(f"     Desc: {desc[:80]}")
+            click.echo()
     else:
-        print("No agents found in registry.")
+        click.echo("  (no agents found)")
+
+    # List MCP servers
+    click.echo("── MCP Servers ─────────────────────────────────────────────")
+    servers = list_registered_mcp_servers(project_id, location)
+    if servers:
+        for server in servers:
+            click.echo(f"  📡 {server.get('displayName', 'N/A')}")
+            click.echo(f"     Name: {server.get('name', 'N/A')}")
+            desc = server.get("description", "")
+            if desc:
+                click.echo(f"     Desc: {desc[:80]}")
+            click.echo()
+    else:
+        click.echo("  (no MCP servers found)")
+
+    click.echo(f"\n  Total: {len(agents)} agents, {len(servers)} MCP servers")
+
+
+@cli.command()
+@click.option(
+    "--project-id",
+    type=str,
+    default=None,
+    help=f"GCP project ID (default: {PROJECT_ID})",
+)
+@click.option(
+    "--location",
+    type=str,
+    default=None,
+    help=f"GCP region (default: {LOCATION})",
+)
+@click.option(
+    "--agent-name",
+    type=str,
+    default=None,
+    help="Full resource name of remote A2A agent (default: REGISTRY_AGENT_NAME from env)",
+)
+def orchestrate(
+    project_id: str | None,
+    location: str | None,
+    agent_name: str | None,
+) -> None:
+    """Create an orchestrator agent with a remote A2A sub-agent."""
+    project_id = project_id or PROJECT_ID
+    location = location or LOCATION
+    agent_name = agent_name or AGENT_NAME
+
+    click.echo(
+        """
+    ╔═══════════════════════════════════════════════════════════╗
+    ║                                                           ║
+    ║   🤖 AGENT REGISTRY — Create Orchestrator                 ║
+    ║                                                           ║
+    ╚═══════════════════════════════════════════════════════════╝
+    """
+    )
+
+    click.echo(f"  Project:    {project_id}")
+    click.echo(f"  Location:   {location}")
+    click.echo(f"  Agent Name: {agent_name}")
+
+    agent = create_orchestrator_agent(
+        project_id=project_id,
+        location=location,
+        agent_name=agent_name,
+    )
+
+    click.echo(f"\n  ✅ Orchestrator agent created: {agent.name}")
+    click.echo(f"     Sub-agents: {[sa.name for sa in agent.sub_agents]}")
 
 
 if __name__ == "__main__":
-    agent = create_orchestrator_agent()
-    print(f"✅ Orchestrator agent created: {agent.name}")
-    print(f"   Sub-agents: {[sa.name for sa in agent.sub_agents]}")
+    cli()
