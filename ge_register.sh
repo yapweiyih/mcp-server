@@ -1,11 +1,10 @@
-#! /bin/env bash
+#!/usr/bin/env bash
 
 # Source environment variables from .env file
 # Get the directory where this script is located
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 echo
-# echo "########################################################"
 if [ -f "${SCRIPT_DIR}/adk_agent/.env" ]; then
   source "${SCRIPT_DIR}/adk_agent/.env"
   echo "Loaded environment variables from adk_agent/.env file"
@@ -19,7 +18,6 @@ echo "     OAUTH_AUTH_URI: ${OAUTH_AUTH_URI}"
 echo "     ENGINE_ID: $ENGINE_ID"
 echo "     DISPLAY_NAME: $DISPLAY_NAME"
 echo "     AUTH_ID: $AUTH_ID"
-# echo "########################################################"
 echo
 echo
 
@@ -33,11 +31,12 @@ fi
 DESCRIPTION="This is your AI productivity agent"
 TOOL_DESCRIPTION="You are a AI productivity agent."
 LOCATION="us-central1"
-# OAUTH_CLIENT_ID=$(gcloud secrets versions access latest --secret="AGENTSPACE_WEB_CLIENTID" --project="${PROJECT_NUMBER}")
-# OAUTH_CLIENT_SECRET=$(gcloud secrets versions access latest --secret="AGENTSPACE_WEB_CLIENTSECRET" --project="${PROJECT_NUMBER}") # pragma: allowlist secret
+OAUTH_CLIENT_ID=$(gcloud secrets versions access latest --secret="AGENTSPACE_WEB_CLIENTID" --project="${PROJECT_NUMBER}")
+OAUTH_CLIENT_SECRET=$(gcloud secrets versions access latest --secret="AGENTSPACE_WEB_CLIENTSECRET" --project="${PROJECT_NUMBER}") # pragma: allowlist secret
 OAUTH_TOKEN_URI="https://oauth2.googleapis.com/token"
 
 ADK_DEPLOYMENT_ID=$ENGINE_ID
+BASE_URL="https://discoveryengine.googleapis.com/v1alpha/projects/${PROJECT_NUMBER}/locations/global/collections/default_collection/engines/${APP_ID}/assistants/default_assistant/agents"
 
 usage() {
   echo "Usage: $0 {"
@@ -63,12 +62,12 @@ COMMAND=$1
 
 case $COMMAND in
   register)
-    # No additional arguments needed - using values from .env
-    curl -X POST \
+    curl -s -X POST \
       -H "Authorization: Bearer $(gcloud auth print-access-token)" \
       -H "Content-Type: application/json" \
       -H "X-Goog-User-Project: ${PROJECT_NUMBER}" \
-      "https://discoveryengine.googleapis.com/v1alpha/projects/${PROJECT_NUMBER}/locations/global/collections/default_collection/engines/${APP_ID}/assistants/default_assistant/agents" \
+      -w "\nHTTP Status Code: %{http_code}\n" \
+      "${BASE_URL}" \
       -d '{
         "displayName": "'"${DISPLAY_NAME}"'",
         "description": "'"${DESCRIPTION}"'",
@@ -80,15 +79,15 @@ case $COMMAND in
             "reasoning_engine": "projects/'"${PROJECT_NUMBER}"'/locations/'"${LOCATION}"'/reasoningEngines/'"${ADK_DEPLOYMENT_ID}"'"
           }
         }
-      }'
+      }' | jq .
     ;;
   register-auth)
-    # No additional arguments needed - using values from .env
-    curl -X POST \
+    curl -s -X POST \
       -H "Authorization: Bearer $(gcloud auth print-access-token)" \
       -H "Content-Type: application/json" \
       -H "X-Goog-User-Project: ${PROJECT_NUMBER}" \
-      "https://discoveryengine.googleapis.com/v1alpha/projects/${PROJECT_NUMBER}/locations/global/collections/default_collection/engines/${APP_ID}/assistants/default_assistant/agents" \
+      -w "\nHTTP Status Code: %{http_code}\n" \
+      "${BASE_URL}" \
       -d '{
         "displayName": "'"${DISPLAY_NAME}"'",
         "description": "'"${DESCRIPTION}"'",
@@ -98,16 +97,15 @@ case $COMMAND in
           },
           "provisioned_reasoning_engine": {
             "reasoning_engine": "projects/'"${PROJECT_NUMBER}"'/locations/'"${LOCATION}"'/reasoningEngines/'"${ADK_DEPLOYMENT_ID}"'"
-          },
-          "authorizations": [
-            "projects/'"${PROJECT_NUMBER}"'/locations/global/authorizations/'"${AUTH_ID}"'"
-          ]
+          }
+        },
+        "authorization_config": {
+            "tool_authorizations": ["projects/'"${PROJECT_NUMBER}"'/locations/global/authorizations/'"${AUTH_ID}"'"]
         }
-      }'
+      }' | jq .
     ;;
   create-auth)
-    # No additional arguments needed - using AUTH_ID from .env
-    curl -X POST \
+    curl -s -X POST \
       -H "Authorization: Bearer $(gcloud auth print-access-token)" \
       -H "Content-Type: application/json" \
       -H "X-Goog-User-Project: ${PROJECT_NUMBER}" \
@@ -121,54 +119,47 @@ case $COMMAND in
           "authorizationUri": "'"${OAUTH_AUTH_URI}"'",
           "tokenUri": "'"${OAUTH_TOKEN_URI}"'"
         }
-      }'
+      }' | jq .
     ;;
   delete-auth)
-    # No additional arguments needed - using AUTH_ID from .env
-    curl -X DELETE \
+    curl -s -X DELETE \
       -H "Authorization: Bearer $(gcloud auth print-access-token)" \
       -H "Content-Type: application/json" \
       -H "X-Goog-User-Project: ${PROJECT_NUMBER}" \
       -w "\nHTTP Status Code: %{http_code}\n" \
-      "https://discoveryengine.googleapis.com/v1alpha/projects/${PROJECT_NUMBER}/locations/global/authorizations/${AUTH_ID}"
+      "https://discoveryengine.googleapis.com/v1alpha/projects/${PROJECT_NUMBER}/locations/global/authorizations/${AUTH_ID}" | jq .
     ;;
-    list)
+  list)
     if [ $# -eq 2 ]; then
-      # If a name parameter is provided, filter the results
+      # Name filter given — show full details for matching agents
       NAME=$2
       RESPONSE=$(curl -s -X GET \
         -H "Authorization: Bearer $(gcloud auth print-access-token)" \
         -H "Content-Type: application/json" \
         -H "X-Goog-User-Project: ${PROJECT_NUMBER}" \
-        "https://discoveryengine.googleapis.com/v1alpha/projects/${PROJECT_NUMBER}/locations/global/collections/default_collection/engines/${APP_ID}/assistants/default_assistant/agents")
+        "${BASE_URL}")
 
-      # Check if jq is installed
       if command -v jq &> /dev/null; then
-        # Use jq to filter the response for the agent with the specified displayName
-        # Make the search case-insensitive and allow partial matches
-        FILTERED_RESPONSE=$(echo "$RESPONSE" | jq --arg name "$NAME" '{agents: [.agents[] | select(.displayName | ascii_downcase | contains($name | ascii_downcase))]}')
-
-        # Check if any agents were found
-        AGENT_COUNT=$(echo "$FILTERED_RESPONSE" | jq '.agents | length')
-        if [ "$AGENT_COUNT" -eq 0 ]; then
+        FILTERED=$(echo "$RESPONSE" | jq --arg name "$NAME" \
+          '{agents: [.agents[]? | select(.displayName | ascii_downcase | contains($name | ascii_downcase))]}')
+        COUNT=$(echo "$FILTERED" | jq '.agents | length')
+        if [ "$COUNT" -eq 0 ]; then
           echo "No agents found with name containing '$NAME'."
           echo "Available agents:"
-          echo "$RESPONSE" | jq '.agents[].displayName'
+          echo "$RESPONSE" | jq -r '.agents[]?.displayName // empty'
         else
-          echo "$FILTERED_RESPONSE"
+          echo "$FILTERED" | jq .
         fi
       else
-        echo "Warning: jq is not installed. Displaying unfiltered results."
-        echo "To filter results, please install jq: https://stedolan.github.io/jq/download/"
         echo "$RESPONSE"
       fi
     else
-      # If no name parameter is provided, return all agents
-      curl -X GET \
+      # No name filter — show compact summary only
+      curl -s -X GET \
         -H "Authorization: Bearer $(gcloud auth print-access-token)" \
         -H "Content-Type: application/json" \
         -H "X-Goog-User-Project: ${PROJECT_NUMBER}" \
-        "https://discoveryengine.googleapis.com/v1alpha/projects/${PROJECT_NUMBER}/locations/global/collections/default_collection/engines/${APP_ID}/assistants/default_assistant/agents"
+        "${BASE_URL}" | jq '[.agents[]? | {displayName, reasoningEngine: (.adkAgentDefinition.provisionedReasoningEngine.reasoningEngine // .a2aAgentDefinition.jsonAgentCard // "N/A"), agentId: (.name | split("/") | last)}]'
     fi
     ;;
   delete)
@@ -177,11 +168,12 @@ case $COMMAND in
       usage
     fi
     AGENT_ID=$2
-    curl -X DELETE \
+    curl -s -X DELETE \
       -H "Authorization: Bearer $(gcloud auth print-access-token)" \
       -H "Content-Type: application/json" \
       -H "X-Goog-User-Project: ${PROJECT_NUMBER}" \
-      "https://discoveryengine.googleapis.com/v1alpha/projects/${PROJECT_NUMBER}/locations/global/collections/default_collection/engines/${APP_ID}/assistants/default_assistant/agents/${AGENT_ID}"
+      -w "\nHTTP Status Code: %{http_code}\n" \
+      "${BASE_URL}/${AGENT_ID}" | jq .
     ;;
   update)
     if [ $# -ne 2 ]; then
@@ -189,13 +181,13 @@ case $COMMAND in
       usage
     fi
     AGENT_ID=$2
-    # Using DISPLAY_NAME from .env as the new display name
     NEW_DISPLAY_NAME=$DISPLAY_NAME
-    curl -X PATCH \
+    curl -s -X PATCH \
       -H "Authorization: Bearer $(gcloud auth print-access-token)" \
       -H "Content-Type: application/json" \
       -H "X-Goog-User-Project: ${PROJECT_NUMBER}" \
-      "https://discoveryengine.googleapis.com/v1alpha/projects/${PROJECT_NUMBER}/locations/global/collections/default_collection/engines/${APP_ID}/assistants/default_assistant/agents/${AGENT_ID}" \
+      -w "\nHTTP Status Code: %{http_code}\n" \
+      "${BASE_URL}/${AGENT_ID}" \
       -d '{
         "displayName": "'"${NEW_DISPLAY_NAME}"'",
         "description": "'"${DESCRIPTION}"'",
@@ -207,7 +199,7 @@ case $COMMAND in
             "reasoning_engine": "projects/'"${PROJECT_NUMBER}"'/locations/'"${LOCATION}"'/reasoningEngines/'"${ADK_DEPLOYMENT_ID}"'"
           }
         }
-      }'
+      }' | jq .
     ;;
   update-auth)
     if [ $# -ne 2 ]; then
@@ -215,13 +207,13 @@ case $COMMAND in
       usage
     fi
     AGENT_ID=$2
-    # Using values from .env
     NEW_DISPLAY_NAME=$DISPLAY_NAME
-    curl -X PATCH \
+    curl -s -X PATCH \
       -H "Authorization: Bearer $(gcloud auth print-access-token)" \
       -H "Content-Type: application/json" \
       -H "X-Goog-User-Project: ${PROJECT_NUMBER}" \
-      "https://discoveryengine.googleapis.com/v1alpha/projects/${PROJECT_NUMBER}/locations/global/collections/default_collection/engines/${APP_ID}/assistants/default_assistant/agents/${AGENT_ID}" \
+      -w "\nHTTP Status Code: %{http_code}\n" \
+      "${BASE_URL}/${AGENT_ID}" \
       -d '{
         "displayName": "'"${NEW_DISPLAY_NAME}"'",
         "description": "'"${DESCRIPTION}"'",
@@ -231,12 +223,12 @@ case $COMMAND in
           },
           "provisioned_reasoning_engine": {
             "reasoning_engine": "projects/'"${PROJECT_NUMBER}"'/locations/'"${LOCATION}"'/reasoningEngines/'"${ADK_DEPLOYMENT_ID}"'"
-          },
-          "authorizations": [
-            "projects/'"${PROJECT_NUMBER}"'/locations/global/authorizations/'"${AUTH_ID}"'"
-          ]
+          }
+        },
+        "authorization_config": {
+            "tool_authorizations": ["projects/'"${PROJECT_NUMBER}"'/locations/global/authorizations/'"${AUTH_ID}"'"]
         }
-      }'
+      }' | jq .
     ;;
   *)
     usage
