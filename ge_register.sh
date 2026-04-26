@@ -7,18 +7,21 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 echo
 if [ -f "${SCRIPT_DIR}/adk_agent/.env" ]; then
   source "${SCRIPT_DIR}/adk_agent/.env"
-  echo "Loaded environment variables from adk_agent/.env file"
+  echo "✅ Loaded environment from adk_agent/.env"
 else
   echo "Warning: .env file not found in ${SCRIPT_DIR}/adk_agent/"
 fi
 
-echo "     GOOGLE_CLOUD_PROJECT: ${GOOGLE_CLOUD_PROJECT}"
-echo "     APP_ID: ${APP_ID}"
-echo "     OAUTH_AUTH_URI: ${OAUTH_AUTH_URI}"
-echo "     ENGINE_ID: $ENGINE_ID"
-echo "     DISPLAY_NAME: $DISPLAY_NAME"
-echo "     AUTH_ID: $AUTH_ID"
-echo
+echo ""
+echo "╔═══════════════════════════════════════════════════════════╗"
+echo "║   📋 ADK Agent Configuration (ge_register.sh)             ║"
+echo "╠═══════════════════════════════════════════════════════════╣"
+echo "  Project:       ${GOOGLE_CLOUD_PROJECT}"
+echo "  APP_ID:        ${APP_ID}"
+echo "  ENGINE_ID:     ${ENGINE_ID}"
+echo "  DISPLAY_NAME:  ${DISPLAY_NAME}"
+echo "  AUTH_ID:       ${AUTH_ID}"
+echo "╚═══════════════════════════════════════════════════════════╝"
 echo
 
 if [ -n "$GOOGLE_CLOUD_PROJECT" ]; then
