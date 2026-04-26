@@ -19,8 +19,9 @@
 #   bash ge_a2a_register.sh update <AGENT_ID>
 #   bash ge_a2a_register.sh update-auth <AGENT_ID>
 #   bash ge_a2a_register.sh delete <AGENT_ID>
-#   bash ge_a2a_register.sh create-auth
-#   bash ge_a2a_register.sh delete-auth
+#
+# Authorization resource management (create-auth, delete-auth) is shared
+# across agent types — use ge_register.sh for those commands.
 
 set -euo pipefail
 
@@ -143,9 +144,8 @@ usage() {
   echo "  update-auth <AGENT_ID> Update with OAuth authorizationConfig"
   echo "  delete <AGENT_ID>     Delete an agent registration"
   echo ""
-  echo "Authorization commands:"
-  echo "  create-auth           Create OAuth authorization resource (needs OAUTH_CLIENT_ID/SECRET)"
-  echo "  delete-auth           Delete the OAuth authorization resource"
+  echo "Note: For authorization resource management (create-auth, delete-auth),"
+  echo "      use ge_register.sh — auth resources are shared across agent types."
   echo ""
   echo "Configuration is loaded from adk_agent/.env"
   exit 1
@@ -331,70 +331,6 @@ case $COMMAND in
 
     echo ""
     echo "✅ Delete complete."
-    ;;
-
-  create-auth)
-    : "${AUTH_ID:?Missing AUTH_ID in .env}"
-    : "${OAUTH_CLIENT_ID:?Missing OAUTH_CLIENT_ID in .env}"
-    : "${OAUTH_CLIENT_SECRET:?Missing OAUTH_CLIENT_SECRET in .env}"
-    : "${OAUTH_AUTH_URI:?Missing OAUTH_AUTH_URI in .env}"
-    OAUTH_TOKEN_URI="${OAUTH_TOKEN_URI:-https://oauth2.googleapis.com/token}"
-
-    AUTH_BASE_URL="https://${ENDPOINT_LOCATION}-discoveryengine.googleapis.com/v1alpha/projects/${PROJECT_NUMBER}/locations/${ENDPOINT_LOCATION}/authorizations"
-
-    echo ""
-    echo "🔐 Action: CREATE authorization resource"
-    echo "  Project:    ${GOOGLE_CLOUD_PROJECT}"
-    echo "  Endpoint:   ${ENDPOINT_LOCATION}"
-    echo "  AUTH_ID:    ${AUTH_ID}"
-    echo "  Client ID:  ${OAUTH_CLIENT_ID:0:20}..."
-    echo "  Token URI:  ${OAUTH_TOKEN_URI}"
-    confirm
-
-    echo ""
-    echo "🔑 Creating authorization resource..."
-    curl -s -X POST \
-      -H "Authorization: Bearer $(gcloud auth print-access-token)" \
-      -H "Content-Type: application/json" \
-      -H "X-Goog-User-Project: ${PROJECT_NUMBER}" \
-      -w "\nHTTP Status Code: %{http_code}\n" \
-      "${AUTH_BASE_URL}?authorizationId=${AUTH_ID}" \
-      -d '{
-        "name": "projects/'"${PROJECT_NUMBER}"'/locations/'"${ENDPOINT_LOCATION}"'/authorizations/'"${AUTH_ID}"'",
-        "serverSideOauth2": {
-          "clientId": "'"${OAUTH_CLIENT_ID}"'",
-          "clientSecret": "'"${OAUTH_CLIENT_SECRET}"'",
-          "authorizationUri": "'"${OAUTH_AUTH_URI}"'",
-          "tokenUri": "'"${OAUTH_TOKEN_URI}"'"
-        }
-      }'
-
-    echo ""
-    echo "✅ Authorization resource created."
-    ;;
-
-  delete-auth)
-    : "${AUTH_ID:?Missing AUTH_ID in .env}"
-
-    AUTH_BASE_URL="https://${ENDPOINT_LOCATION}-discoveryengine.googleapis.com/v1alpha/projects/${PROJECT_NUMBER}/locations/${ENDPOINT_LOCATION}/authorizations"
-
-    echo ""
-    echo "⚠️  Action: DELETE authorization resource"
-    echo "  Project:  ${GOOGLE_CLOUD_PROJECT}"
-    echo "  AUTH_ID:  ${AUTH_ID}"
-    confirm
-
-    echo ""
-    echo "🗑️  Deleting authorization resource..."
-    curl -s -X DELETE \
-      -H "Authorization: Bearer $(gcloud auth print-access-token)" \
-      -H "Content-Type: application/json" \
-      -H "X-Goog-User-Project: ${PROJECT_NUMBER}" \
-      -w "\nHTTP Status Code: %{http_code}\n" \
-      "${AUTH_BASE_URL}/${AUTH_ID}"
-
-    echo ""
-    echo "✅ Authorization resource deleted."
     ;;
 
   *)
