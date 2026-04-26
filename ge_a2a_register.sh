@@ -12,10 +12,12 @@
 #
 # Usage:
 #   bash ge_a2a_register.sh register
+#   bash ge_a2a_register.sh register-auth
 #   bash ge_a2a_register.sh list
 #   bash ge_a2a_register.sh list <name>
 #   bash ge_a2a_register.sh get <AGENT_ID>
 #   bash ge_a2a_register.sh update <AGENT_ID>
+#   bash ge_a2a_register.sh update-auth <AGENT_ID>
 #   bash ge_a2a_register.sh delete <AGENT_ID>
 
 set -euo pipefail
@@ -36,7 +38,7 @@ fi
 : "${APP_ID:?Missing APP_ID in .env}"
 : "${A2A_ENGINE_ID:?Missing A2A_ENGINE_ID in .env (deploy with 'make deploy-a2a-agent-engine' first)}"
 
-DISPLAY_NAME="${DISPLAY_NAME:-ER Query Agent (A2A)}"
+DISPLAY_NAME="${DISPLAY_NAME_A2A:-ER Query Agent (A2A)}"
 DESCRIPTION="${DESCRIPTION:-An AI agent that queries Expert Request data from Firestore via A2A protocol}"
 LOCATION="${GOOGLE_CLOUD_LOCATION:-us-central1}"
 ENDPOINT_LOCATION="${ENDPOINT_LOCATION:-global}"
@@ -102,16 +104,42 @@ AGENT_CARD_JSON=$(echo "$AGENT_CARD_JSON" | \
 # Escape for JSON embedding (single-line, escaped quotes)
 AGENT_CARD_ESCAPED=$(echo "$AGENT_CARD_JSON" | jq -c '.' | sed 's/"/\\"/g')
 
+# ─── Build JSON payload ──────────────────────────────────────────────
+# Builds the request body, optionally including authorizationConfig
+build_payload() {
+  local include_auth=${1:-false}
+  local payload='{
+    "name": "'"${DISPLAY_NAME}"'",
+    "displayName": "'"${DISPLAY_NAME}"'",
+    "description": "'"${DESCRIPTION}"'",
+    "a2aAgentDefinition": {
+      "jsonAgentCard": "'"${AGENT_CARD_ESCAPED}"'"
+    }'
+
+  if [ "$include_auth" = "true" ] && [ -n "${AUTH_ID:-}" ]; then
+    payload="${payload}"',
+    "authorizationConfig": {
+      "agentAuthorization": "projects/'"${PROJECT_NUMBER}"'/locations/'"${ENDPOINT_LOCATION}"'/authorizations/'"${AUTH_ID}"'"
+    }'
+  fi
+
+  payload="${payload}"'
+  }'
+  echo "$payload"
+}
+
 # ─── Usage ────────────────────────────────────────────────────────────
 usage() {
-  echo "Usage: $0 { register | list [name] | get <AGENT_ID> | update <AGENT_ID> | delete <AGENT_ID> }"
+  echo "Usage: $0 { register | register-auth | list [name] | get <AGENT_ID> | update <AGENT_ID> | update-auth <AGENT_ID> | delete <AGENT_ID> }"
   echo ""
   echo "Commands:"
-  echo "  register           Register the A2A agent with Gemini Enterprise"
-  echo "  list [name]        List all agents (optionally filter by name)"
-  echo "  get <AGENT_ID>     Get agent details with parsed agent card JSON"
-  echo "  update <AGENT_ID>  Update an existing agent's card and config"
-  echo "  delete <AGENT_ID>  Delete an agent registration"
+  echo "  register              Register the A2A agent with Gemini Enterprise"
+  echo "  register-auth         Register with OAuth authorizationConfig (needs AUTH_ID)"
+  echo "  list [name]           List all agents (optionally filter by name)"
+  echo "  get <AGENT_ID>        Get agent details with parsed agent card JSON"
+  echo "  update <AGENT_ID>     Update an existing agent's card and config"
+  echo "  update-auth <AGENT_ID> Update with OAuth authorizationConfig"
+  echo "  delete <AGENT_ID>     Delete an agent registration"
   echo ""
   echo "Configuration is loaded from adk_agent/.env"
   exit 1
@@ -156,10 +184,19 @@ confirm() {
 COMMAND=$1
 
 case $COMMAND in
-  register)
+  register|register-auth)
     show_config
-    echo "📝 Action: REGISTER new A2A agent"
+    INCLUDE_AUTH="false"
+    if [ "$COMMAND" = "register-auth" ]; then
+      : "${AUTH_ID:?Missing AUTH_ID in .env for register-auth}"
+      INCLUDE_AUTH="true"
+      echo "  Auth ID:          ${AUTH_ID}"
+      echo ""
+    fi
+    echo "📝 Action: REGISTER new A2A agent (auth=${INCLUDE_AUTH})"
     confirm
+
+    PAYLOAD=$(build_payload "$INCLUDE_AUTH")
 
     echo ""
     echo "🚀 Registering A2A agent..."
@@ -168,14 +205,7 @@ case $COMMAND in
       -H "Content-Type: application/json" \
       -H "X-Goog-User-Project: ${PROJECT_NUMBER}" \
       "${BASE_URL}" \
-      -d '{
-        "name": "'"${DISPLAY_NAME}"'",
-        "displayName": "'"${DISPLAY_NAME}"'",
-        "description": "'"${DESCRIPTION}"'",
-        "a2aAgentDefinition": {
-          "jsonAgentCard": "'"${AGENT_CARD_ESCAPED}"'"
-        }
-      }' | jq .
+      -d "${PAYLOAD}" | jq .
 
     echo ""
     echo "✅ Registration complete. Use 'list' to see the AGENT_ID."
@@ -239,16 +269,25 @@ case $COMMAND in
     fi
     ;;
 
-  update)
+  update|update-auth)
     if [ $# -ne 2 ]; then
-      echo "Error: update requires AGENT_ID argument."
+      echo "Error: ${COMMAND} requires AGENT_ID argument."
       usage
     fi
     AGENT_ID=$2
 
     show_config
-    echo "📝 Action: UPDATE agent ${AGENT_ID}"
+    INCLUDE_AUTH="false"
+    if [ "$COMMAND" = "update-auth" ]; then
+      : "${AUTH_ID:?Missing AUTH_ID in .env for update-auth}"
+      INCLUDE_AUTH="true"
+      echo "  Auth ID:          ${AUTH_ID}"
+      echo ""
+    fi
+    echo "📝 Action: UPDATE agent ${AGENT_ID} (auth=${INCLUDE_AUTH})"
     confirm
+
+    PAYLOAD=$(build_payload "$INCLUDE_AUTH")
 
     echo ""
     echo "🔄 Updating A2A agent..."
@@ -257,14 +296,7 @@ case $COMMAND in
       -H "Content-Type: application/json" \
       -H "X-Goog-User-Project: ${PROJECT_NUMBER}" \
       "${BASE_URL}/${AGENT_ID}" \
-      -d '{
-        "name": "'"${DISPLAY_NAME}"'",
-        "displayName": "'"${DISPLAY_NAME}"'",
-        "description": "'"${DESCRIPTION}"'",
-        "a2aAgentDefinition": {
-          "jsonAgentCard": "'"${AGENT_CARD_ESCAPED}"'"
-        }
-      }' | jq .
+      -d "${PAYLOAD}" | jq .
 
     echo ""
     echo "✅ Update complete."
