@@ -14,6 +14,7 @@
 #   bash ge_a2a_register.sh register
 #   bash ge_a2a_register.sh list
 #   bash ge_a2a_register.sh list <name>
+#   bash ge_a2a_register.sh get <AGENT_ID>
 #   bash ge_a2a_register.sh update <AGENT_ID>
 #   bash ge_a2a_register.sh delete <AGENT_ID>
 
@@ -103,11 +104,12 @@ AGENT_CARD_ESCAPED=$(echo "$AGENT_CARD_JSON" | jq -c '.' | sed 's/"/\\"/g')
 
 # ─── Usage ────────────────────────────────────────────────────────────
 usage() {
-  echo "Usage: $0 { register | list [name] | update <AGENT_ID> | delete <AGENT_ID> }"
+  echo "Usage: $0 { register | list [name] | get <AGENT_ID> | update <AGENT_ID> | delete <AGENT_ID> }"
   echo ""
   echo "Commands:"
   echo "  register           Register the A2A agent with Gemini Enterprise"
   echo "  list [name]        List all agents (optionally filter by name)"
+  echo "  get <AGENT_ID>     Get agent details with parsed agent card JSON"
   echo "  update <AGENT_ID>  Update an existing agent's card and config"
   echo "  delete <AGENT_ID>  Delete an agent registration"
   echo ""
@@ -208,6 +210,32 @@ case $COMMAND in
         -H "Authorization: Bearer $(gcloud auth print-access-token)" \
         -H "X-Goog-User-Project: ${PROJECT_NUMBER}" \
         "${BASE_URL}" | jq .
+    fi
+    ;;
+
+  get)
+    if [ $# -ne 2 ]; then
+      echo "Error: get requires AGENT_ID argument."
+      usage
+    fi
+    AGENT_ID=$2
+
+    echo "🔎 Fetching agent details for ${AGENT_ID}..."
+    RESPONSE=$(curl -s -X GET \
+      -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+      -H "X-Goog-User-Project: ${PROJECT_NUMBER}" \
+      "${BASE_URL}/${AGENT_ID}")
+
+    # Pretty-print the response and parse the embedded jsonAgentCard
+    if command -v jq &> /dev/null; then
+      echo ""
+      echo "── Agent Metadata ──────────────────────────────────────────"
+      echo "$RESPONSE" | jq '{name, displayName, description, createTime, state}'
+      echo ""
+      echo "── Agent Card (parsed JSON) ────────────────────────────────"
+      echo "$RESPONSE" | jq -r '.a2aAgentDefinition.jsonAgentCard // empty' | jq .
+    else
+      echo "$RESPONSE"
     fi
     ;;
 
