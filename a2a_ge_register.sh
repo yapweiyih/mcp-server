@@ -25,7 +25,7 @@ echo "╠═══════════════════════�
 echo "  Project:        ${GOOGLE_CLOUD_PROJECT}"
 echo "  APP_ID:         ${APP_ID}"
 echo "  A2A_ENGINE_ID:  ${A2A_ENGINE_ID}"
-echo "  DISPLAY_NAME:   ${DISPLAY_NAME_A2A:-ER Query Agent (A2A)}"
+echo "  DISPLAY_NAME:   ${A2A_DISPLAY_NAME:-ER Query Agent (A2A)}"
 echo "  A2A_AUTH_ID:    ${A2A_AUTH_ID}"
 echo "╚═══════════════════════════════════════════════════════════╝"
 echo
@@ -37,7 +37,7 @@ else
   exit 1
 fi
 
-DISPLAY_NAME="${DISPLAY_NAME_A2A:-ER Query Agent (A2A)}"
+DISPLAY_NAME="${A2A_DISPLAY_NAME:-ER Query Agent (A2A)}"
 DESCRIPTION="${DESCRIPTION_A2A:-An AI agent that queries Expert Request data via A2A protocol}"
 LOCATION="${GOOGLE_CLOUD_LOCATION:-us-central1}"
 OAUTH_CLIENT_ID=$(gcloud secrets versions access latest --secret="AGENTSPACE_WEB_CLIENTID" --project="${PROJECT_NUMBER}")
