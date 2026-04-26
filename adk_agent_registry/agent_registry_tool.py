@@ -161,10 +161,43 @@ def list(
     if agents:
         for agent in agents:
             click.echo(f"  📌 {agent.get('displayName', 'N/A')}")
-            click.echo(f"     Name: {agent.get('name', 'N/A')}")
+            click.echo(f"     Resource:  {agent.get('name', 'N/A')}")
+
+            # Protocol type (A2A_AGENT or CUSTOM)
+            protocols = agent.get("protocols", [])
+            proto_types = [p.get("type", "?") for p in protocols]
+            click.echo(f"     Protocol:  {', '.join(proto_types)}")
+
+            # Framework (from attributes)
+            attrs = agent.get("attributes", {})
+            framework = attrs.get(
+                "agentregistry.googleapis.com/system/Framework", {}
+            ).get("framework", "N/A")
+            click.echo(f"     Framework: {framework}")
+
+            # Runtime reference (reasoning engine URI)
+            runtime_ref = attrs.get(
+                "agentregistry.googleapis.com/system/RuntimeReference", {}
+            ).get("uri", "")
+            if runtime_ref:
+                click.echo(f"     Runtime:   {runtime_ref}")
+
+            # Created time
+            created = agent.get("createTime", "")
+            if created:
+                click.echo(f"     Created:   {created[:19]}")
+
+            # Description
             desc = agent.get("description", "")
             if desc:
-                click.echo(f"     Desc: {desc[:80]}")
+                click.echo(f"     Desc:      {desc[:80]}")
+
+            # Skills
+            skills = agent.get("skills", [])
+            if skills:
+                skill_names = [s.get("name", "?") for s in skills]
+                click.echo(f"     Skills:    {', '.join(skill_names)}")
+
             click.echo()
     else:
         click.echo("  (no agents found)")
@@ -175,10 +208,13 @@ def list(
     if servers:
         for server in servers:
             click.echo(f"  📡 {server.get('displayName', 'N/A')}")
-            click.echo(f"     Name: {server.get('name', 'N/A')}")
+            click.echo(f"     Resource: {server.get('name', 'N/A')}")
             desc = server.get("description", "")
             if desc:
-                click.echo(f"     Desc: {desc[:80]}")
+                click.echo(f"     Desc:     {desc[:80]}")
+            created = server.get("createTime", "")
+            if created:
+                click.echo(f"     Created:  {created[:19]}")
             click.echo()
     else:
         click.echo("  (no MCP servers found)")
