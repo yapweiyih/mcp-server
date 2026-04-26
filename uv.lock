@@ -583,7 +583,7 @@ dependencies = [
     { name = "ag-ui-adk" },
     { name = "click" },
     { name = "fastapi" },
-    { name = "google-adk", extra = ["a2a"] },
+    { name = "google-adk", extra = ["a2a", "agent-identity"] },
     { name = "google-cloud-aiplatform", extra = ["adk", "agent-engines"] },
     { name = "google-cloud-firestore" },
     { name = "mcp", extra = ["cli"] },
@@ -607,7 +607,7 @@ requires-dist = [
     { name = "black", marker = "extra == 'dev'", specifier = ">=24.0.0" },
     { name = "click", specifier = ">=8.3.1" },
     { name = "fastapi", specifier = ">=0.115.0" },
-    { name = "google-adk", extras = ["a2a"], specifier = ">=1.16.0" },
+    { name = "google-adk", extras = ["a2a", "agent-identity"], specifier = ">=1.16.0" },
     { name = "google-cloud-aiplatform", extras = ["adk", "agent-engines"], specifier = ">=1.112" },
     { name = "google-cloud-firestore", specifier = ">=2.19.0" },
     { name = "mcp", extras = ["cli"], specifier = ">=1.0.0" },
@@ -800,6 +800,9 @@ wheels = [
 [package.optional-dependencies]
 a2a = [
     { name = "a2a-sdk" },
+]
+agent-identity = [
+    { name = "google-cloud-iamconnectorcredentials" },
 ]
 
 [[package]]
@@ -1074,6 +1077,22 @@ dependencies = [
 sdist = { url = "https://us-python.pkg.dev/artifact-foundry-prod/ah-3p-staging-python/google-cloud-iam/google_cloud_iam-2.22.0.tar.gz", hash = "sha256:203ddfece17e014ee4fbc5c3244daa14a88b7ee57c8e3a7622d0f2a1a3b8d7f3" }
 wheels = [
     { url = "https://us-python.pkg.dev/artifact-foundry-prod/ah-3p-staging-python/google-cloud-iam/google_cloud_iam-2.22.0-py3-none-any.whl", hash = "sha256:c443b34b5a6a9e51d32cee397879bb781b900af68937c67a275def23bbc025f3" },
+]
+
+[[package]]
+name = "google-cloud-iamconnectorcredentials"
+version = "0.1.0"
+source = { registry = "https://us-python.pkg.dev/artifact-foundry-prod/ah-3p-staging-python/simple/" }
+dependencies = [
+    { name = "google-api-core", extra = ["grpc"] },
+    { name = "google-auth" },
+    { name = "grpcio" },
+    { name = "proto-plus" },
+    { name = "protobuf" },
+]
+sdist = { url = "https://us-python.pkg.dev/artifact-foundry-prod/ah-3p-staging-python/google-cloud-iamconnectorcredentials/google_cloud_iamconnectorcredentials-0.1.0.tar.gz", hash = "sha256:7b94186bad6ae106c232bae795475eb9214dbc03cccf62cb117a43fe9169d675" }
+wheels = [
+    { url = "https://us-python.pkg.dev/artifact-foundry-prod/ah-3p-staging-python/google-cloud-iamconnectorcredentials/google_cloud_iamconnectorcredentials-0.1.0-py3-none-any.whl", hash = "sha256:38239d5cd2b71c090a06e2dd5e21ee0308799d39fb4095dcea918e35575a750c" },
 ]
 
 [[package]]
