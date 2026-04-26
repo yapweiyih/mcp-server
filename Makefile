@@ -175,7 +175,11 @@ delete-a2a-gemini-enterprise:
 	bash a2a_ge_register.sh delete $(ID)
 
 test-cloud-agent:
-	uv run python ae_cloud_test.py
+	uv run python ae_cloud_test.py test
+
+grant-iam-agent:
+	@if [ -z "$(ROLE)" ]; then echo "Usage: make grant-iam-agent ROLE=roles/datastore.user"; exit 1; fi
+	uv run python ae_cloud_test.py grant-iam --role $(ROLE)
 
 test-gemini-enterprise:
 	uv run python ge_stream_assist_sharepoint.py
