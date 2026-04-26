@@ -144,6 +144,12 @@ deploy-a2a-agent-engine:
 deploy-adk-gemini-enterprise:
 	bash ge_register.sh register
 
+deploy-a2a-gemini-enterprise:
+	bash ge_a2a_register.sh register
+
+list-a2a-gemini-enterprise:
+	bash ge_a2a_register.sh list
+
 delete-gemini-enterprise:
 	bash ge_delete_agent.sh
 
