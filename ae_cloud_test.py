@@ -189,6 +189,7 @@ def grant_iam_to_agent(
         project_id,
         f"--member={member}",
         f"--role={role}",
+        "--condition=None",
         "--format=json",
         "--quiet",
     ]
