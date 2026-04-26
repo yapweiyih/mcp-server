@@ -174,6 +174,9 @@ delete-a2a-gemini-enterprise:
 	@if [ -z "$(ID)" ]; then echo "Usage: make delete-a2a-gemini-enterprise ID=<AGENT_ID>"; exit 1; fi
 	bash a2a_ge_register.sh delete $(ID)
 
+test-cloud-agent:
+	uv run python ae_cloud_test.py
+
 test-gemini-enterprise:
 	uv run python ge_stream_assist_sharepoint.py
 
