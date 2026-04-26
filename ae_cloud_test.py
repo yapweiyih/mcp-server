@@ -60,7 +60,9 @@ async def test_on_cloud(
     click.echo(f"  Resource: {resource_name}")
 
     vertexai.init(project=project_id, location=location)
-    live_app = vertexai.agent_engines.get(resource_name)
+    from vertexai import agent_engines
+
+    live_app = agent_engines.get(resource_name)
 
     session = live_app.create_session(user_id="u_test")
     session_id = session.get("id", session) if isinstance(session, dict) else session
