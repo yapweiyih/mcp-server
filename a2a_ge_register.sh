@@ -26,7 +26,7 @@ echo "  Project:        ${GOOGLE_CLOUD_PROJECT}"
 echo "  APP_ID:         ${APP_ID}"
 echo "  A2A_ENGINE_ID:  ${A2A_ENGINE_ID}"
 echo "  DISPLAY_NAME:   ${DISPLAY_NAME_A2A:-ER Query Agent (A2A)}"
-echo "  AUTH_ID:        ${AUTH_ID}"
+echo "  A2A_AUTH_ID:    ${A2A_AUTH_ID}"
 echo "╚═══════════════════════════════════════════════════════════╝"
 echo
 
@@ -147,7 +147,7 @@ case $COMMAND in
           "jsonAgentCard": "'"${AGENT_CARD}"'"
         },
         "authorizationConfig": {
-          "agentAuthorization": "projects/'"${PROJECT_NUMBER}"'/locations/global/authorizations/'"${AUTH_ID}"'"
+          "agentAuthorization": "projects/'"${PROJECT_NUMBER}"'/locations/global/authorizations/'"${A2A_AUTH_ID}"'"
         }
       }'
     ;;
@@ -156,13 +156,13 @@ case $COMMAND in
       -H "Authorization: Bearer $(gcloud auth print-access-token)" \
       -H "Content-Type: application/json" \
       -H "X-Goog-User-Project: ${PROJECT_NUMBER}" \
-      "https://discoveryengine.googleapis.com/v1alpha/projects/${PROJECT_NUMBER}/locations/global/authorizations?authorizationId=${AUTH_ID}" \
+      "https://discoveryengine.googleapis.com/v1alpha/projects/${PROJECT_NUMBER}/locations/global/authorizations?authorizationId=${A2A_AUTH_ID}" \
       -d '{
-        "name": "projects/'"${PROJECT_NUMBER}"'/locations/global/authorizations/'"${AUTH_ID}"'",
+        "name": "projects/'"${PROJECT_NUMBER}"'/locations/global/authorizations/'"${A2A_AUTH_ID}"'",
         "serverSideOauth2": {
           "clientId": "'"${OAUTH_CLIENT_ID}"'",
           "clientSecret": "'"${OAUTH_CLIENT_SECRET}"'",
-          "authorizationUri": "'"${OAUTH_AUTH_URI}"'",
+          "authorizationUri": "'"${A2A_OAUTH_AUTH_URI}"'",
           "tokenUri": "'"${OAUTH_TOKEN_URI}"'"
         }
       }'
@@ -172,7 +172,7 @@ case $COMMAND in
       -H "Authorization: Bearer $(gcloud auth print-access-token)" \
       -H "Content-Type: application/json" \
       -H "X-Goog-User-Project: ${PROJECT_NUMBER}" \
-      "https://discoveryengine.googleapis.com/v1alpha/projects/${PROJECT_NUMBER}/locations/global/authorizations/${AUTH_ID}"
+      "https://discoveryengine.googleapis.com/v1alpha/projects/${PROJECT_NUMBER}/locations/global/authorizations/${A2A_AUTH_ID}"
     ;;
   list)
     if [ $# -eq 2 ]; then
