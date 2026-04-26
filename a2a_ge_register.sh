@@ -44,13 +44,14 @@ OAUTH_CLIENT_ID=$(gcloud secrets versions access latest --secret="AGENTSPACE_WEB
 OAUTH_CLIENT_SECRET=$(gcloud secrets versions access latest --secret="AGENTSPACE_WEB_CLIENTSECRET" --project="${PROJECT_NUMBER}") # pragma: allowlist secret
 OAUTH_TOKEN_URI="https://oauth2.googleapis.com/token"
 
-# A2A agent URL (Agent Engine endpoint)
-A2A_URL="https://${LOCATION}-aiplatform.googleapis.com/v1beta1/projects/${PROJECT_NUMBER}/locations/${LOCATION}/reasoningEngines/${A2A_ENGINE_ID}"
+# A2A agent URL (Agent Engine endpoint, must end with /a2a)
+A2A_URL="https://${LOCATION}-aiplatform.googleapis.com/v1beta1/projects/${PROJECT_NUMBER}/locations/${LOCATION}/reasoningEngines/${A2A_ENGINE_ID}/a2a"
 
 # Base API URL
 BASE_URL="https://discoveryengine.googleapis.com/v1alpha/projects/${PROJECT_NUMBER}/locations/global/collections/default_collection/engines/${APP_ID}/assistants/default_assistant/agents"
 
 # Build the jsonAgentCard (escaped JSON string for embedding)
+# Must match the agent card returned by the deployed Agent Engine
 AGENT_CARD=$(jq -n -c \
   --arg name "$DISPLAY_NAME" \
   --arg desc "$DESCRIPTION" \
@@ -61,23 +62,25 @@ AGENT_CARD=$(jq -n -c \
     description: $desc,
     url: $url,
     version: "1.0.0",
+    preferredTransport: "HTTP+JSON",
+    supportsAuthenticatedExtendedCard: true,
     defaultInputModes: ["text/plain"],
-    defaultOutputModes: ["text/plain"],
-    capabilities: {},
+    defaultOutputModes: ["application/json"],
+    capabilities: { streaming: false },
     skills: [
       {
         id: "search_expert_requests",
         name: "Search Expert Requests",
-        description: "Search and retrieve Expert Request (ER) data from Firestore.",
-        tags: ["Expert Request", "ER", "Firestore"],
-        examples: ["Find all ERs assigned to user@google.com", "How many ERs were created in 2024?"]
+        description: "Search and retrieve Expert Request (ER) data from Firestore. Can search by assigned CE email, creation date, or specific ER fields.",
+        tags: ["Expert Request", "ER", "Firestore", "Search"],
+        examples: ["Find all ERs assigned to user@google.com", "How many ERs were created in 2024?", "Show me the FSA status of ER-431059", "What ERs were created in April 2024?"]
       },
       {
         id: "background_tasks",
         name: "Background Task Management",
-        description: "Submit and monitor long-running background tasks.",
+        description: "Submit and monitor long-running background tasks. Tasks run asynchronously and can be checked for completion.",
         tags: ["Tasks", "Background", "Async"],
-        examples: ["Submit a background task called data_sync for 10 seconds"]
+        examples: ["Submit a background task called data_sync for 10 seconds", "Check the status of my task"]
       }
     ]
   }' | sed 's/"/\\"/g')
