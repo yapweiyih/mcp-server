@@ -50,4 +50,5 @@ temp/
 # Misc
 *.log
 adk_agent/.adk/
+adk_agent_registry/.adk/
 a2a_agent_card.json
