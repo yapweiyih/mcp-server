@@ -151,7 +151,7 @@ list-a2a-gemini-enterprise:
 	bash a2a_ge_register.sh list
 
 get-a2a-agent-card-from-ae:
-	uv run python ge_get_agent_card.py
+	uv run python ae_get_agent_card.py
 
 delete-gemini-enterprise:
 	bash ge_delete_agent.sh
