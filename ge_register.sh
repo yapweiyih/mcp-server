@@ -41,6 +41,18 @@ OAUTH_TOKEN_URI="https://oauth2.googleapis.com/token"
 ADK_DEPLOYMENT_ID=$ENGINE_ID
 BASE_URL="https://discoveryengine.googleapis.com/v1alpha/projects/${PROJECT_NUMBER}/locations/global/collections/default_collection/engines/${APP_ID}/assistants/default_assistant/agents"
 
+# Helper: execute curl, pretty-print JSON response, show HTTP status code
+curl_jq() {
+  local tmpfile
+  tmpfile=$(mktemp)
+  local http_code
+  http_code=$(curl -s -o "$tmpfile" -w "%{http_code}" "$@")
+  jq . "$tmpfile" 2>/dev/null || cat "$tmpfile"
+  echo ""
+  echo "HTTP Status Code: ${http_code}"
+  rm -f "$tmpfile"
+}
+
 usage() {
   echo "Usage: $0 {"
   echo "  register |"
@@ -65,11 +77,10 @@ COMMAND=$1
 
 case $COMMAND in
   register)
-    curl -s -X POST \
+    curl_jq -X POST \
       -H "Authorization: Bearer $(gcloud auth print-access-token)" \
       -H "Content-Type: application/json" \
       -H "X-Goog-User-Project: ${PROJECT_NUMBER}" \
-      -w "\nHTTP Status Code: %{http_code}\n" \
       "${BASE_URL}" \
       -d '{
         "displayName": "'"${DISPLAY_NAME}"'",
@@ -82,14 +93,13 @@ case $COMMAND in
             "reasoning_engine": "projects/'"${PROJECT_NUMBER}"'/locations/'"${LOCATION}"'/reasoningEngines/'"${ADK_DEPLOYMENT_ID}"'"
           }
         }
-      }' | jq .
+      }'
     ;;
   register-auth)
-    curl -s -X POST \
+    curl_jq -X POST \
       -H "Authorization: Bearer $(gcloud auth print-access-token)" \
       -H "Content-Type: application/json" \
       -H "X-Goog-User-Project: ${PROJECT_NUMBER}" \
-      -w "\nHTTP Status Code: %{http_code}\n" \
       "${BASE_URL}" \
       -d '{
         "displayName": "'"${DISPLAY_NAME}"'",
@@ -105,14 +115,13 @@ case $COMMAND in
         "authorization_config": {
             "tool_authorizations": ["projects/'"${PROJECT_NUMBER}"'/locations/global/authorizations/'"${AUTH_ID}"'"]
         }
-      }' | jq .
+      }'
     ;;
   create-auth)
-    curl -s -X POST \
+    curl_jq -X POST \
       -H "Authorization: Bearer $(gcloud auth print-access-token)" \
       -H "Content-Type: application/json" \
       -H "X-Goog-User-Project: ${PROJECT_NUMBER}" \
-      -w "\nHTTP Status Code: %{http_code}\n" \
       "https://discoveryengine.googleapis.com/v1alpha/projects/${PROJECT_NUMBER}/locations/global/authorizations?authorizationId=${AUTH_ID}" \
       -d '{
         "name": "projects/'"${PROJECT_NUMBER}"'/locations/global/authorizations/'"${AUTH_ID}"'",
@@ -122,15 +131,14 @@ case $COMMAND in
           "authorizationUri": "'"${OAUTH_AUTH_URI}"'",
           "tokenUri": "'"${OAUTH_TOKEN_URI}"'"
         }
-      }' | jq .
+      }'
     ;;
   delete-auth)
-    curl -s -X DELETE \
+    curl_jq -X DELETE \
       -H "Authorization: Bearer $(gcloud auth print-access-token)" \
       -H "Content-Type: application/json" \
       -H "X-Goog-User-Project: ${PROJECT_NUMBER}" \
-      -w "\nHTTP Status Code: %{http_code}\n" \
-      "https://discoveryengine.googleapis.com/v1alpha/projects/${PROJECT_NUMBER}/locations/global/authorizations/${AUTH_ID}" | jq .
+      "https://discoveryengine.googleapis.com/v1alpha/projects/${PROJECT_NUMBER}/locations/global/authorizations/${AUTH_ID}"
     ;;
   list)
     if [ $# -eq 2 ]; then
@@ -171,12 +179,11 @@ case $COMMAND in
       usage
     fi
     AGENT_ID=$2
-    curl -s -X DELETE \
+    curl_jq -X DELETE \
       -H "Authorization: Bearer $(gcloud auth print-access-token)" \
       -H "Content-Type: application/json" \
       -H "X-Goog-User-Project: ${PROJECT_NUMBER}" \
-      -w "\nHTTP Status Code: %{http_code}\n" \
-      "${BASE_URL}/${AGENT_ID}" | jq .
+      "${BASE_URL}/${AGENT_ID}"
     ;;
   update)
     if [ $# -ne 2 ]; then
@@ -185,11 +192,10 @@ case $COMMAND in
     fi
     AGENT_ID=$2
     NEW_DISPLAY_NAME=$DISPLAY_NAME
-    curl -s -X PATCH \
+    curl_jq -X PATCH \
       -H "Authorization: Bearer $(gcloud auth print-access-token)" \
       -H "Content-Type: application/json" \
       -H "X-Goog-User-Project: ${PROJECT_NUMBER}" \
-      -w "\nHTTP Status Code: %{http_code}\n" \
       "${BASE_URL}/${AGENT_ID}" \
       -d '{
         "displayName": "'"${NEW_DISPLAY_NAME}"'",
@@ -202,7 +208,7 @@ case $COMMAND in
             "reasoning_engine": "projects/'"${PROJECT_NUMBER}"'/locations/'"${LOCATION}"'/reasoningEngines/'"${ADK_DEPLOYMENT_ID}"'"
           }
         }
-      }' | jq .
+      }'
     ;;
   update-auth)
     if [ $# -ne 2 ]; then
@@ -211,11 +217,10 @@ case $COMMAND in
     fi
     AGENT_ID=$2
     NEW_DISPLAY_NAME=$DISPLAY_NAME
-    curl -s -X PATCH \
+    curl_jq -X PATCH \
       -H "Authorization: Bearer $(gcloud auth print-access-token)" \
       -H "Content-Type: application/json" \
       -H "X-Goog-User-Project: ${PROJECT_NUMBER}" \
-      -w "\nHTTP Status Code: %{http_code}\n" \
       "${BASE_URL}/${AGENT_ID}" \
       -d '{
         "displayName": "'"${NEW_DISPLAY_NAME}"'",
@@ -231,7 +236,7 @@ case $COMMAND in
         "authorization_config": {
             "tool_authorizations": ["projects/'"${PROJECT_NUMBER}"'/locations/global/authorizations/'"${AUTH_ID}"'"]
         }
-      }' | jq .
+      }'
     ;;
   *)
     usage
