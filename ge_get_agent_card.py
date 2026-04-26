@@ -138,11 +138,16 @@ def main(
 
     location = location or os.getenv("GOOGLE_CLOUD_LOCATION", "us-central1")
 
-    click.echo(f"📇 Fetching agent card...", err=True)
-    click.echo(f"   Project:     {project_id}", err=True)
-    click.echo(f"   Location:    {location}", err=True)
-    click.echo(f"   Resource ID: {resource_id}", err=True)
-    click.echo(err=True)
+    output_file = "a2a_agent_card.json"
+
+    click.echo()
+    click.echo("╔═══════════════════════════════════════════════════════════╗")
+    click.echo("║   📇 Fetching A2A Agent Card from Agent Engine           ║")
+    click.echo("╚═══════════════════════════════════════════════════════════╝")
+    click.echo(f"  Project:     {project_id}")
+    click.echo(f"  Location:    {location}")
+    click.echo(f"  Resource ID: {resource_id}")
+    click.echo()
 
     card = asyncio.run(
         get_agent_card(
@@ -152,8 +157,32 @@ def main(
         )
     )
 
-    # Output clean JSON to stdout (metadata goes to stderr)
-    click.echo(json.dumps(card, indent=2, default=str))
+    card_json = json.dumps(card, indent=2, default=str)
+
+    # Save to file
+    with open(output_file, "w") as f:
+        f.write(card_json + "\n")
+
+    # Display summary
+    click.echo("── Agent Card Summary ──────────────────────────────────────")
+    click.echo(f"  Name:             {card.get('name', 'N/A')}")
+    click.echo(f"  Description:      {card.get('description', 'N/A')}")
+    click.echo(f"  URL:              {card.get('url', 'N/A')}")
+    click.echo(f"  Version:          {card.get('version', 'N/A')}")
+    click.echo(f"  Protocol:         {card.get('protocolVersion', 'N/A')}")
+    click.echo(f"  Input Modes:      {card.get('defaultInputModes', [])}")
+    click.echo(f"  Output Modes:     {card.get('defaultOutputModes', [])}")
+
+    skills = card.get("skills", [])
+    click.echo(f"  Skills ({len(skills)}):")
+    for skill in skills:
+        click.echo(f"    • {skill.get('name', '?')} — {skill.get('description', '')}")
+
+    click.echo()
+    click.echo("── Full JSON ───────────────────────────────────────────────")
+    click.echo(card_json)
+    click.echo()
+    click.echo(f"✅ Saved to {output_file}")
 
 
 if __name__ == "__main__":
