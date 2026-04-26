@@ -48,7 +48,10 @@ Deployment targets:
 │   └── src/app/api/copilotkit/  #   API route → AG-UI → ADK agent
 ├── agui_server.py               # AG-UI backend server (CopilotKit ↔ ADK bridge)
 ├── ae_deploy.py                 # Deploy ADK agent to Vertex AI Agent Engine
-├── ge_register.sh               # Register Agent Engine ID to Gemini Enterprise
+├── ae_cloud_test.py             # Test + manage deployed agent (smoke test, IAM)
+├── ae_get_agent_card.py         # Fetch A2A agent card from Agent Engine
+├── ge_register.sh               # Register/manage ADK agent in Gemini Enterprise
+├── a2a_ge_register.sh           # Register/manage A2A agent in Gemini Enterprise
 ├── ge_delete_agent.sh           # Delete Gemini Enterprise agent registration
 ├── ge_stream_assist_sharepoint.py # Test agent on Gemini Enterprise
 ├── tests/
@@ -66,8 +69,7 @@ Deployment targets:
 │   └── er-query/SKILL.md        # Agent skill definition
 ├── Dockerfile                   # Cloud Run container (MCP server)
 ├── Makefile                     # All commands
-├── pyproject.toml               # Dependencies (uv)
-└── er_431059.json               # Sample ER data (schema reference)
+└── pyproject.toml               # Dependencies (uv)
 ```
 
 ## Quick Start
@@ -160,25 +162,71 @@ make test-cloud
 
 ### ADK Agent → Vertex AI Agent Engine
 
+Two deployment modes via `ae_deploy.py`:
+
+| Mode | Flag | Identity |
+|------|------|----------|
+| Standard (default) | (none) | Project's default service account |
+| Agent Identity | `--agent-identity` | Unique SPIFFE-based per-agent identity |
+
 ```bash
-# Deploy ADK agent to Agent Engine
+# Deploy ADK agent to Agent Engine (service account)
 make deploy-adk-agent-engine
+
+# Deploy with Agent Identity (least-privilege)
+uv run python ae_deploy.py --agent-identity
 
 # Deploy A2A agent to Agent Engine
 make deploy-a2a-agent-engine
 ```
 
-### Agent Engine → Gemini Enterprise
+### Post-Deployment — Test & IAM
+
+`ae_cloud_test.py` provides subcommands for testing and configuring deployed agents:
 
 ```bash
-# Register Agent Engine ID to Gemini Enterprise
+# Smoke test deployed agent
+uv run python ae_cloud_test.py test
+make test-cloud-agent
+
+# Verbose debug output (shows raw event structure)
+uv run python ae_cloud_test.py test --verbose
+
+# Grant IAM role to agent identity (required for Agent Identity mode)
+uv run python ae_cloud_test.py grant-iam --role roles/datastore.user
+make grant-iam-agent ROLE=roles/datastore.user
+```
+
+### Agent Engine → Gemini Enterprise
+
+Two registration scripts manage agents in Gemini Enterprise. Both auto-populate `AGENT_ID` / `A2A_AGENT_ID` in `.env` on success.
+
+| Script | Agent Type | Definition |
+|--------|-----------|------------|
+| `ge_register.sh` | ADK | `adk_agent_definition` + `provisioned_reasoning_engine` |
+| `a2a_ge_register.sh` | A2A | `a2aAgentDefinition` + `jsonAgentCard` |
+
+```bash
+# Register ADK agent (without/with OAuth auth)
 make deploy-adk-gemini-enterprise
+make deploy-adk-gemini-enterprise-auth
+
+# Register A2A agent (without/with OAuth auth)
+make deploy-a2a-gemini-enterprise
+make deploy-a2a-gemini-enterprise-auth
+
+# List all registered agents
+make list-gemini-enterprise
+
+# Delete a specific agent registration
+make delete-gemini-enterprise ID=<AGENT_ID>
+make delete-a2a-gemini-enterprise ID=<AGENT_ID>
+
+# Fetch A2A agent card from Agent Engine
+make get-a2a-agent-card-from-ae
 
 # Test agent on Gemini Enterprise
 make test-gemini-enterprise
-
-# Delete Gemini Enterprise registration
-make delete-gemini-enterprise
 ```
 
 ## Environment Configuration
@@ -192,6 +240,15 @@ Copy `adk_agent/.env_example` to `adk_agent/.env` and fill in:
 | `DATABASE_ID` | Firestore database ID |
 | `COLLECTION` | Firestore collection name |
 | `MCP_SERVER_URL` | Remote MCP server URL (for SSE/HTTP mode) |
+| `ENGINE_ID` | ADK Agent Engine reasoning engine ID (auto-populated) |
+| `AGENT_IDENTITY` | Agent identity principal string (auto-populated with `--agent-identity`) |
+| `AGENT_ID` | ADK agent registration ID in GE (auto-populated) |
+| `AUTH_ID` | ADK agent OAuth authorization resource ID |
+| `OAUTH_AUTH_URI` | OAuth authorization URI for ADK agent |
+| `A2A_ENGINE_ID` | A2A Agent Engine reasoning engine ID |
+| `A2A_AGENT_ID` | A2A agent registration ID in GE (auto-populated) |
+| `A2A_AUTH_ID` | A2A agent OAuth authorization resource ID |
+| `A2A_OAUTH_AUTH_URI` | OAuth authorization URI for A2A agent (needs `cloud-platform` scope) |
 
 ## MCP Tools
 
@@ -226,8 +283,16 @@ Copy `adk_agent/.env_example` to `adk_agent/.env` and fill in:
 | `deploy-mcp-server-cloudrun` | Build + deploy MCP to Cloud Run |
 | `deploy-adk-agent-engine` | Deploy ADK agent to Agent Engine |
 | `deploy-a2a-agent-engine` | Deploy A2A agent to Agent Engine |
-| `deploy-adk-gemini-enterprise` | Register to Gemini Enterprise |
-| `delete-gemini-enterprise` | Delete Gemini Enterprise registration |
+| `deploy-adk-gemini-enterprise` | Register ADK agent to Gemini Enterprise |
+| `deploy-adk-gemini-enterprise-auth` | Register ADK agent with OAuth auth |
+| `deploy-a2a-gemini-enterprise` | Register A2A agent to Gemini Enterprise |
+| `deploy-a2a-gemini-enterprise-auth` | Register A2A agent with OAuth auth |
+| `list-gemini-enterprise` | List all registered agents |
+| `get-a2a-agent-card-from-ae` | Fetch A2A agent card from Agent Engine |
+| `delete-gemini-enterprise ID=...` | Delete ADK agent registration |
+| `delete-a2a-gemini-enterprise ID=...` | Delete A2A agent registration |
+| `test-cloud-agent` | Smoke test deployed agent on Agent Engine |
+| `grant-iam-agent ROLE=...` | Grant IAM role to agent identity |
 | `test-gemini-enterprise` | Test on Gemini Enterprise |
 | `lint` | Syntax check all Python files |
 | `clean` | Remove build artifacts |

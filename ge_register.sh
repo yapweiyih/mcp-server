@@ -53,6 +53,18 @@ curl_jq() {
   rm -f "$tmpfile"
 }
 
+# Helper: update a variable in adk_agent/.env
+update_env_var() {
+  local key=$1 value=$2
+  local env_file="${SCRIPT_DIR}/adk_agent/.env"
+  if grep -q "^${key}=" "$env_file" 2>/dev/null; then
+    sed -i '' "s/^${key}=.*/${key}=${value}/" "$env_file"
+  else
+    echo "${key}=${value}" >> "$env_file"
+  fi
+  echo "✅ Updated ${key}=${value} in adk_agent/.env"
+}
+
 usage() {
   echo "Usage: $0 {"
   echo "  register |"
@@ -76,46 +88,45 @@ fi
 COMMAND=$1
 
 case $COMMAND in
-  register)
-    curl_jq -X POST \
-      -H "Authorization: Bearer $(gcloud auth print-access-token)" \
-      -H "Content-Type: application/json" \
-      -H "X-Goog-User-Project: ${PROJECT_NUMBER}" \
-      "${BASE_URL}" \
-      -d '{
-        "displayName": "'"${DISPLAY_NAME}"'",
-        "description": "'"${DESCRIPTION}"'",
-        "adk_agent_definition": {
-          "tool_settings": {
-            "tool_description": "'"${TOOL_DESCRIPTION}"'"
-          },
-          "provisioned_reasoning_engine": {
-            "reasoning_engine": "projects/'"${PROJECT_NUMBER}"'/locations/'"${LOCATION}"'/reasoningEngines/'"${ADK_DEPLOYMENT_ID}"'"
-          }
-        }
-      }'
-    ;;
-  register-auth)
-    curl_jq -X POST \
-      -H "Authorization: Bearer $(gcloud auth print-access-token)" \
-      -H "Content-Type: application/json" \
-      -H "X-Goog-User-Project: ${PROJECT_NUMBER}" \
-      "${BASE_URL}" \
-      -d '{
-        "displayName": "'"${DISPLAY_NAME}"'",
-        "description": "'"${DESCRIPTION}"'",
-        "adk_agent_definition": {
-          "tool_settings": {
-            "tool_description": "'"${TOOL_DESCRIPTION}"'"
-          },
-          "provisioned_reasoning_engine": {
-            "reasoning_engine": "projects/'"${PROJECT_NUMBER}"'/locations/'"${LOCATION}"'/reasoningEngines/'"${ADK_DEPLOYMENT_ID}"'"
-          }
+  register|register-auth)
+    PAYLOAD='{
+      "displayName": "'"${DISPLAY_NAME}"'",
+      "description": "'"${DESCRIPTION}"'",
+      "adk_agent_definition": {
+        "tool_settings": {
+          "tool_description": "'"${TOOL_DESCRIPTION}"'"
         },
-        "authorization_config": {
-            "tool_authorizations": ["projects/'"${PROJECT_NUMBER}"'/locations/global/authorizations/'"${AUTH_ID}"'"]
+        "provisioned_reasoning_engine": {
+          "reasoning_engine": "projects/'"${PROJECT_NUMBER}"'/locations/'"${LOCATION}"'/reasoningEngines/'"${ADK_DEPLOYMENT_ID}"'"
         }
       }'
+    if [ "$COMMAND" = "register-auth" ]; then
+      PAYLOAD="${PAYLOAD}"',
+      "authorization_config": {
+        "tool_authorizations": ["projects/'"${PROJECT_NUMBER}"'/locations/global/authorizations/'"${AUTH_ID}"'"]
+      }'
+    fi
+    PAYLOAD="${PAYLOAD}"'}'
+
+    TMPFILE=$(mktemp)
+    HTTP_CODE=$(curl -s -o "$TMPFILE" -w "%{http_code}" -X POST \
+      -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+      -H "Content-Type: application/json" \
+      -H "X-Goog-User-Project: ${PROJECT_NUMBER}" \
+      "${BASE_URL}" \
+      -d "${PAYLOAD}")
+    jq . "$TMPFILE" 2>/dev/null || cat "$TMPFILE"
+    echo ""
+    echo "HTTP Status Code: ${HTTP_CODE}"
+
+    # Auto-populate AGENT_ID on success
+    if [ "$HTTP_CODE" = "200" ]; then
+      NEW_ID=$(jq -r '.name // empty' "$TMPFILE" | awk -F/ '{print $NF}')
+      if [ -n "$NEW_ID" ] && [ "$NEW_ID" != "null" ]; then
+        update_env_var "AGENT_ID" "$NEW_ID"
+      fi
+    fi
+    rm -f "$TMPFILE"
     ;;
   create-auth)
     curl_jq -X POST \
