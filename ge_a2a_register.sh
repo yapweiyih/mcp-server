@@ -209,7 +209,7 @@ case $COMMAND in
       curl -s -X GET \
         -H "Authorization: Bearer $(gcloud auth print-access-token)" \
         -H "X-Goog-User-Project: ${PROJECT_NUMBER}" \
-        "${BASE_URL}" | jq .
+        "${BASE_URL}" | jq '[.agents[]? | {displayName, reasoningEngine: (.adkAgentDefinition.provisionedReasoningEngine.reasoningEngine // .a2aAgentDefinition.jsonAgentCard // "N/A"), agentId: (.name | split("/") | last)}]'
     fi
     ;;
 
